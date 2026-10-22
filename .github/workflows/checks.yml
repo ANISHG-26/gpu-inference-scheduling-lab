@@ -31,3 +31,12 @@ jobs:
         with:
           persist-credentials: false
       - run: docker build -f containers/expiry.Dockerfile -t inference-lab-expiry:check .
+  ray-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: docker build -f containers/ray.Dockerfile -t inference-lab-ray:check .
+      - run: docker run --rm inference-lab-ray:check python -c 'import inference_lab.ray_app'
