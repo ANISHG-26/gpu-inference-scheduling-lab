@@ -150,6 +150,7 @@
     const heading = node("div", "result-heading");
     heading.append(node("strong", "", `Experiment ${exp.state}`));
     if (exp.lesson_id) heading.append(node("span", "muted small", ` · ${lessonById(exp.lesson_id)?.title || exp.lesson_id}`));
+    heading.append(node("span", "muted small", ` · concurrency ${exp.concurrency} · started ${formatTime(exp.started_at)}`));
     els.result.append(heading);
     if (exp.state === "running") { els.result.append(node("p", "muted small", "Measurement is running; this view will update automatically.")); return; }
     if (exp.state === "failed") els.result.append(node("p", "error-copy", readableExperimentError(exp.error)));
@@ -200,7 +201,7 @@
     else if (latest?.active_lesson !== selectedId) els.actionStatus.textContent = "Only the server-designated active lesson can run.";
     else if (experimentRunning) els.actionStatus.textContent = "An experiment is already running.";
     else if (!lesson?.actions_enabled) els.actionStatus.textContent = lesson?.reason || lesson?.gate || "The operator has disabled this action.";
-    else if (!actionBusy && !actionFeedback) els.actionStatus.textContent = "Ready. This run uses 8 requests with 32 output tokens each.";
+    else if (!actionBusy && !actionFeedback) els.actionStatus.textContent = "Ready. This run uses 8 requests with up to 32 output tokens each.";
   }
   function render() { renderLessonNav(); renderLesson(); renderSession(); renderObservation(); renderExperiment(); renderConnection(); }
   async function refresh() {
