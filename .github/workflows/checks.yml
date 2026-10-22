@@ -39,4 +39,4 @@ jobs:
         with:
           persist-credentials: false
       - run: docker build -f containers/ray.Dockerfile -t inference-lab-ray:check .
-      - run: docker run --rm inference-lab-ray:check python -c 'import inference_lab.ray_app'
+      - run: docker run --rm inference-lab-ray:check python -c 'import os; assert os.getuid() != 0; import inference_lab.ray_app'
