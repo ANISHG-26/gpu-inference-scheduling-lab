@@ -316,6 +316,15 @@ class CloudTaskTests(unittest.TestCase):
         with self.assertRaisesRegex(LabError, "task name"):
             self.create(CloudTasks(http_session=http))
 
+    def test_registration_uses_cloud_tasks_create_request_envelope(self) -> None:
+        name = "projects/private-project/locations/northamerica-northeast1/queues/queue/tasks/expire-012345abcdef"
+        http = self.FakeHttp([self.FakeResponse(200, {"name": name})])
+        self.create(CloudTasks(http_session=http))
+        payload = http.calls[0][2]
+        self.assertEqual(set(payload), {"task"})
+        self.assertEqual(payload["task"]["name"], name)
+        self.assertEqual(payload["task"]["httpRequest"]["oidcToken"]["audience"], "https://expiry.example")
+
 
 if __name__ == "__main__":
     unittest.main()

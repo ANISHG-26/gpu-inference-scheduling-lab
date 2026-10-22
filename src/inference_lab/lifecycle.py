@@ -201,7 +201,7 @@ class CloudTasks:
         try:
             response = session.post(
                 f"https://cloudtasks.googleapis.com/v2/{parent}/tasks",
-                json=task, timeout=30,
+                json={"task": task}, timeout=30,
             )
         except Exception as exc:
             raise LabError("Cloud Tasks registration request failed") from exc
