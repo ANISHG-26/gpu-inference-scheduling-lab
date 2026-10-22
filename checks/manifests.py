@@ -16,6 +16,7 @@ for overlay, replicas in (("base", 1), ("two-nodes", 2)):
     assert "requiredDuringSchedulingIgnoredDuringExecution" in model["spec"]["template"]["spec"]["affinity"]["podAntiAffinity"]
     ray = next(o for o in objects if o["kind"] == "RayService")
     spec = ray["spec"]["rayClusterConfig"]
+    assert spec["authOptions"]["mode"] == "token"
     assert spec["enableInTreeAutoscaling"] is False
     assert spec["headGroupSpec"]["serviceType"] == "ClusterIP"
     assert spec["workerGroupSpecs"][0]["replicas"] == replicas

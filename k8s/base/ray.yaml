@@ -22,6 +22,8 @@ spec:
               num_cpus: 0.25
   rayClusterConfig:
     rayVersion: "2.59.0"
+    authOptions:
+      mode: token
     enableInTreeAutoscaling: false
     headGroupSpec:
       serviceType: ClusterIP
