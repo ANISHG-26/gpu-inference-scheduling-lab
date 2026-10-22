@@ -25,7 +25,9 @@ cluster = gcp.container.Cluster("session", name=cluster_name, project=project, l
     network=pulumi.Output.all(foundation.require_output("networkId"), verified).apply(lambda v: v[0]),
     subnetwork=foundation.require_output("subnetId"),
     resource_labels={"managed-by": "inference-lab", "lab-run": run_id, "lab-expiry": str(expires)},
-    node_locations=[zone], networking_mode="VPC_NATIVE", datapath_provider="ADVANCED_DATAPATH",
+    # A zonal cluster already places nodes in its primary location. This provider's
+    # node_locations field specifies additional zones and must omit the primary.
+    networking_mode="VPC_NATIVE", datapath_provider="ADVANCED_DATAPATH",
     ip_allocation_policy={"cluster_secondary_range_name": "pods", "services_secondary_range_name": "services"},
     release_channel={"channel": "REGULAR"},
     control_plane_endpoints_config={"dns_endpoint_config": {"allow_external_traffic": True},
