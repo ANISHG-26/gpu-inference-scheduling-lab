@@ -1,0 +1,8 @@
+{
+  "project_id": "replace-project-id",
+  "zone": "us-central1-a",
+  "foundation_stack": "replace-org/inference-lab-foundation/dev",
+  "session_stack": "replace-org/inference-lab-session/dev",
+  "ttl_minutes": 120,
+  "node_count": 1
+}

@@ -1,0 +1,6 @@
+name: inference-lab-session
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: Disposable fixed-size CPU GKE session; no GPUs or autoscaling

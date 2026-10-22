@@ -1,0 +1,9 @@
+.git
+.venv
+.lab
+**/venv
+**/__pycache__
+**/Pulumi.*.yaml
+models
+artifacts
+results

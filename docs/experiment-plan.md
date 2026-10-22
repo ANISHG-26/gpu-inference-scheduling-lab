@@ -2,6 +2,8 @@
 
 Status: proposed; no hardware run completed.
 
+Dependency: [GPU access feasibility checks](feasibility-gate.md) must pass first. Do not build a model-serving experiment on an unverified host or assume free-trial GPU availability.
+
 ## Question
 
 When one worker exposes one allocatable GPU, how does Kubernetes handle two pods that each request one exclusive GPU, and what changes after the running pod releases it?
