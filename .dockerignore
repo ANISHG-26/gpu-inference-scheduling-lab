@@ -1,9 +1,11 @@
-.git
-.venv
-.lab
-**/venv
+# Send only intentional build inputs, including the console's static assets.
+**
+!pyproject.toml
+!src/
+!src/**
+!containers/
+!containers/**
+!operator/
+!operator/static/
+!operator/static/**
 **/__pycache__
-**/Pulumi.*.yaml
-models
-artifacts
-results

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Inference Lab · Operator</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#main" aria-label="Inference Lab home"><span class="brand-mark" aria-hidden="true">IL</span><span>Inference Lab <small>OPERATOR</small></span></a>
+    <div class="connection" id="connection" data-state="loading" role="status" aria-live="polite"><span class="connection-dot" aria-hidden="true"></span><span id="connection-text">Connecting to operator</span></div>
+  </header>
+  <main id="main" class="layout">
+    <aside class="sidebar" aria-label="Lesson navigation">
+      <div class="sidebar-heading"><p class="eyebrow">SESSION</p><div class="session-clock"><span id="session-time">—</span><span id="session-label">Waiting for state</span></div></div>
+      <div class="lesson-list" id="lesson-list" aria-label="Lessons"></div>
+      <div class="sidebar-note"><span class="note-icon" aria-hidden="true">i</span><p>Lessons run in sequence. The operator controls which step is active.</p></div>
+    </aside>
+
+    <section class="content" aria-label="Lesson workspace">
+      <div id="sequence-notice" class="sequence-notice" hidden></div>
+      <section class="lesson-head card">
+        <div class="lesson-kicker"><span id="lesson-number">LESSON 01</span><span class="divider">/</span><span id="lesson-state" class="state-pill">Waiting</span></div>
+        <h1 id="lesson-title">Loading lesson…</h1>
+        <p id="lesson-objective" class="objective">The operator is retrieving the current session state.</p>
+        <div id="gate-note" class="gate-note" hidden></div>
+      </section>
+
+      <section class="card steps-card">
+        <div class="section-title"><div><p class="eyebrow">FIELD GUIDE</p><h2>Work through the lesson</h2></div><span class="step-count" id="step-count">—</span></div>
+        <ol id="lesson-steps" class="steps"></ol>
+      </section>
+
+      <div class="workspace-grid">
+        <section class="card experiment-card">
+          <div class="section-title"><div><p class="eyebrow">CONTROLLED EXPERIMENT</p><h2>Run a small batch</h2></div><span class="fixed-batch">8 requests · 32 output tokens</span></div>
+          <p class="muted">A bounded measurement against the active lesson. The request shape and endpoint are fixed.</p>
+          <label class="field-label" for="concurrency">Concurrency</label>
+          <select id="concurrency" name="concurrency"><option value="1">1 worker</option><option value="2">2 workers</option><option value="4">4 workers</option><option value="8">8 workers</option></select>
+          <button id="run-button" class="primary-button" type="button" disabled>Run 8 requests</button>
+          <p id="action-status" class="action-status" role="status" aria-live="polite">Waiting for a fresh session state.</p>
+          <div id="experiment-result" class="experiment-result" aria-live="polite"></div>
+        </section>
+
+        <section class="card prediction-card">
+          <div class="section-title"><div><p class="eyebrow">BEFORE YOU RUN</p><h2>Your prediction</h2></div><span class="local-tag">LOCAL ONLY</span></div>
+          <p id="prediction-prompt" class="muted prediction-prompt">Write down your expectation before the experiment.</p>
+          <label class="sr-only" for="prediction">Write your prediction before running the experiment</label>
+          <textarea id="prediction" rows="5" placeholder="What do you expect to happen as concurrency changes? This note stays in this browser."></textarea>
+          <p class="muted small">Use this note to compare your expectation with the observed result.</p>
+        </section>
+      </div>
+
+      <section class="card observation-card">
+        <div class="section-title"><div><p class="eyebrow">LIVE OBSERVATION</p><h2>Pod placement</h2></div><span id="observation-time" class="observation-time">Not yet observed</span></div>
+        <p id="placement-summary" class="placement-summary">Waiting for a Kubernetes observation.</p>
+        <div class="table-wrap"><table><thead><tr><th scope="col">Pod</th><th scope="col">UID</th><th scope="col">Node</th><th scope="col">Role</th><th scope="col">Phase</th><th scope="col">Ready</th></tr></thead><tbody id="pod-rows"><tr><td colspan="6" class="empty-cell">No current pod observation.</td></tr></tbody></table></div>
+        <p class="identity-note">Ray node identity describes the scheduling layer; it does not identify which model-serving pod handled a request. This table is an API observation, and the balanced request model pod is unknown.</p>
+      </section>
+
+      <section class="card reflection-card">
+        <div class="section-title"><div><p class="eyebrow">AFTER YOU RUN</p><h2>Reflect on the result</h2></div></div>
+        <p id="reflection-text" class="muted">Complete the measurement, then note what matched your prediction and what surprised you.</p>
+      </section>
+      <footer class="page-footer"><span>Local operator · state refreshes every 5 seconds</span><span id="last-refresh">No successful refresh yet</span></footer>
+    </section>
+  </main>
+</body>
+</html>

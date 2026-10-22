@@ -12,11 +12,12 @@ dependencies = []
 [project.optional-dependencies]
 serve = ["ray[serve]==2.59.0", "httpx==0.28.1", "fastapi==0.159.1", "prometheus-client==0.26.0"]
 cloud = ["google-auth==2.62.0", "requests==2.34.2"]
-checks = ["PyYAML==6.0.3", "jsonschema==4.26.0"]
+checks = ["PyYAML==6.0.3", "jsonschema==4.26.0", "numpy==2.3.5"]
 
 [project.scripts]
 inference-lab = "inference_lab.lab:main"
 inference-benchmark = "inference_lab.benchmark:main"
+inference-operator = "inference_lab.operator:serve"
 
 [tool.setuptools.packages.find]
 where = ["src"]

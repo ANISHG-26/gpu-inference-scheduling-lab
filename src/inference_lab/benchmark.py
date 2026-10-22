@@ -4,19 +4,20 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import http.client
 import json
 import math
 from pathlib import Path
 import socket
+import threading
 import time
 from typing import Any
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
-from urllib.request import Request, urlopen
 
 
 MODEL_ID = "Qwen/Qwen3-0.6B"
 PROMPT = "Reply with one short greeting."
+MAX_RESPONSE_BYTES = 65536
 
 
 def validate_url(url: str) -> str:
@@ -56,25 +57,58 @@ def _request_once(index: int, endpoint: str, max_tokens: int, timeout: float) ->
             "stream": False,
         }
     ).encode("utf-8")
-    request = Request(
-        endpoint,
-        data=body,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
-        method="POST",
-    )
     started = time.perf_counter()
     status = None
     error = None
     prompt_tokens = None
     completion_tokens = None
     completed = False
+    connection = None
+    response = None
+    timer = None
+    deadline_fired = threading.Event()
     try:
-        with urlopen(request, timeout=timeout) as response:
-            status = response.status
-            response_body = response.read()
+        parsed = urlsplit(endpoint)
+        connection_type = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        connection = connection_type(parsed.hostname, parsed.port, timeout=timeout)
+        # socket.create_connection's timeout bounds connect, though Python cannot
+        # interrupt a stalled DNS lookup. The elapsed budget below covers the
+        # request once connected.
+        connection.connect()
+        request_socket = connection.sock
+        remaining = timeout - (time.perf_counter() - started)
+        if remaining <= 0:
+            raise socket.timeout("request deadline exceeded")
+        request_socket.settimeout(remaining)
+
+        def interrupt_request():
+            deadline_fired.set()
+            try:
+                request_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+        timer = threading.Timer(remaining, interrupt_request)
+        timer.daemon = True
+        timer.start()
+        target = parsed.path or "/"
+        connection.request(
+            "POST",
+            target,
+            body=body,
+            headers={"Content-Type": "application/json", "Accept": "application/json"},
+        )
+        response = connection.getresponse()
+        status = response.status
+        if 200 <= status < 300:
+            response_body = response.read(MAX_RESPONSE_BYTES + 1)
+            if deadline_fired.is_set() or time.perf_counter() - started > timeout:
+                raise socket.timeout("request deadline exceeded")
+        else:
+            response_body = b""
         if 200 <= status < 300:
             try:
-                decoded = json.loads(response_body)
+                decoded = json.loads(response_body) if len(response_body) <= MAX_RESPONSE_BYTES else None
             except (UnicodeDecodeError, json.JSONDecodeError):
                 decoded = None
             choices = decoded.get("choices") if isinstance(decoded, dict) else None
@@ -98,15 +132,17 @@ def _request_once(index: int, endpoint: str, max_tokens: int, timeout: float) ->
                         completion_tokens = completion_value
         else:
             error = "http_error"
-    except HTTPError as exc:
-        status = exc.code
-        error = "http_error"
     except (TimeoutError, socket.timeout):
         error = "timeout"
-    except URLError as exc:
-        error = "timeout" if isinstance(exc.reason, (TimeoutError, socket.timeout)) else "connection_error"
-    except (OSError, ValueError):
-        error = "connection_error"
+    except (http.client.HTTPException, OSError, ValueError):
+        error = "timeout" if deadline_fired.is_set() or time.perf_counter() - started >= timeout else "connection_error"
+    finally:
+        if timer is not None:
+            timer.cancel()
+        if response is not None:
+            response.close()
+        if connection is not None:
+            connection.close()
 
     metric = {
         "request": index,

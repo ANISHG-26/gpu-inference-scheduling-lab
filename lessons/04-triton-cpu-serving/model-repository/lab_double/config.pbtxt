@@ -1,0 +1,8 @@
+name: "lab_double"
+backend: "python"
+max_batch_size: 8
+version_policy { specific { versions: [1] } }
+input [{ name: "INPUT", data_type: TYPE_FP32, dims: [4] }]
+output [{ name: "OUTPUT", data_type: TYPE_FP32, dims: [4] }]
+instance_group [{ count: 1, kind: KIND_CPU }]
+dynamic_batching { preferred_batch_size: [2, 4, 8], max_queue_delay_microseconds: 1000 }

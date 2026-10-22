@@ -2,7 +2,9 @@
 
 A CPU-first Kubernetes lab for learning inference infrastructure with GCP credits. Provision with **Pulumi Python**. Run a small model with vLLM, route requests through Ray Serve, and measure what happens under load and failure. GPU hardware, Triton and Slurm are later lessons.
 
-First activation, October 22, 2026: the Pulumi foundation and one-node GKE session are deployed. vLLM runs Qwen3-0.6B on CPU, and real generation through private Ray Serve succeeded. All 32 bounded load requests completed without errors; [baseline measurements](docs/results/2026-10-22-cpu-baseline.md) record the setup and limits. Automatic cluster expiry still needs live deletion evidence. [Delivery evidence](docs/preparation.md) distinguishes these checks.
+First activation, October 22, 2026: real Qwen3-0.6B generation through private Ray Serve succeeded and all 32 bounded load requests completed without errors. Automatic expiry subsequently deleted the GKE cluster and its backing VM/disk; session state was reconciled and issue #1 closed. The retained Pulumi foundation remains available. There is no running lab. [Baseline measurements](docs/results/2026-10-22-cpu-baseline.md) and [delivery evidence](docs/preparation.md) distinguish observed results from preparation.
+
+Continue with the [four sequential lessons](lessons/README.md) and the [cluster-hosted operator console](operator/README.md). The console connects to fixed lesson services through one localhost port-forward, shows real pod placement/readiness and remaining lifetime, and runs bounded inference samples. Selecting a lesson does not provision it. Slurm and Triton remain gated preparation inputs; see their [compatibility assessment](docs/lesson-compatibility.md).
 
 ```mermaid
 flowchart LR
