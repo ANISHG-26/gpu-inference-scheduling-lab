@@ -2,7 +2,7 @@
 
 A CPU-first Kubernetes lab for learning inference infrastructure with GCP credits. Provision with **Pulumi Python**. Run a small model with vLLM, route requests through Ray Serve, and measure what happens under load and failure. GPU hardware, Triton and Slurm are later lessons.
 
-Preparation in progress, October 22, 2026. No cloud resources have been created by this implementation. Offline tests are evidence about code behavior; real model execution, cloud expiry and cost remain activation checks. [Delivery evidence](docs/preparation.md) distinguishes them.
+First activation, October 22, 2026: the Pulumi foundation and one-node GKE session are deployed. vLLM runs Qwen3-0.6B on CPU, and real generation through private Ray Serve succeeded. All 32 bounded load requests completed without errors; [baseline measurements](docs/results/2026-10-22-cpu-baseline.md) record the setup and limits. Automatic cluster expiry still needs live deletion evidence. [Delivery evidence](docs/preparation.md) distinguishes these checks.
 
 ```mermaid
 flowchart LR

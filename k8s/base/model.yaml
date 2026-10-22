@@ -26,6 +26,9 @@ spec:
     spec:
       serviceAccountName: inference-lab
       automountServiceAccountToken: false
+      # DNS provides discovery; injected VLLM_PORT would collide with vLLM's
+      # integer-valued internal-port setting.
+      enableServiceLinks: false
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -47,8 +50,9 @@ spec:
             - --dtype=float32
             - --max-model-len=1024
             - --max-num-seqs=8
-            - --kv-cache-memory-bytes=1073741824
-            - --disable-log-requests
+            - --kv-cache-memory-bytes=536870912
+            - --enforce-eager
+            - --no-enable-log-requests
           env:
             - {name: HF_HOME, value: /cache/huggingface}
             - {name: HOME, value: /cache}

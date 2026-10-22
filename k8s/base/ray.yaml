@@ -22,6 +22,8 @@ spec:
               num_cpus: 0.25
   rayClusterConfig:
     rayVersion: "2.59.0"
+    authOptions:
+      mode: token
     enableInTreeAutoscaling: false
     headGroupSpec:
       serviceType: ClusterIP
@@ -44,7 +46,7 @@ spec:
                 - {name: serve, containerPort: 8000}
               resources:
                 requests: {cpu: "250m", memory: 1Gi}
-                limits: {cpu: "500m", memory: 1Gi}
+                limits: {cpu: "500m", memory: 2Gi}
     workerGroupSpecs:
       - groupName: cpu
         replicas: 1

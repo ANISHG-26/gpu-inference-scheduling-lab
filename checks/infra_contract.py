@@ -37,6 +37,8 @@ class Infrastructure(unittest.TestCase):
         foundation = runpy.run_path(str(ROOT / "infra/foundation/__main__.py"))
         def verify(_):
             cluster = next(r.inputs for r in RESOURCES if r.typ == "gcp:container/cluster:Cluster")
+            self.assertEqual(cluster["location"], "us-central1-a")
+            self.assertNotIn("nodeLocations", cluster)
             self.assertNotIn("initialNodeCount", cluster)
             pool = cluster["nodePools"][0]
             self.assertEqual(pool["nodeCount"], 2)

@@ -1,14 +1,14 @@
 # Operator runbook
 
-These are activation instructions for the owner's next session. They have not been executed against GCP. Use Linux for container and model checks. Keep account-specific values, provider output and state private. No Terraform is required.
+These are repeatable activation instructions. The first supervised GCP activation is in progress; see [delivery evidence](preparation.md) for completed checks and remaining gaps. Use Linux for container and model checks. Keep account-specific values, provider output and state private. No Terraform is required.
 
 ## Before spending credits
 
 Confirm the intended project's billing account and current trial balance/expiry/eligibility. An open billing account alone does not establish trial entitlement. Google's [trial restrictions](https://docs.cloud.google.com/free/docs/free-cloud-features) prevent adding GPUs to VMs on an unupgraded trial; this CPU lab does not require a billing upgrade.
 
-Review quotas for N2 CPUs (4 initially, 8 for the later two-node session), zonal capacity, standard persistent disks (30 GB/node), public addresses (one/node), GKE clusters and networking. Confirm `n2-standard-4` and Intel Cascade Lake minimum CPU availability in the selected zone. Test AVX512 flags and vLLM on the actual target. The pinned image exists, but has not been run here. The [CPU engine requirements](https://docs.vllm.ai/en/latest/getting_started/installation/cpu/) and model's memory demand must be checked together.
+Review quotas for N2 CPUs (4 initially, 8 for the later two-node session), zonal capacity, standard persistent disks (30 GB/node), public addresses (one/node), GKE clusters and networking. Confirm `n2-standard-4` and Intel Cascade Lake minimum CPU availability in the selected zone. Test AVX512 flags and vLLM on the actual target. The pinned CPU image has run successfully in the first GKE activation; local Docker image downloads failed with transport errors. The [CPU engine requirements](https://docs.vllm.ai/en/latest/getting_started/installation/cpu/) and model's memory demand must be checked together.
 
-Write down the current full session estimate: GKE management fee after applicable credits, N2 nodes, boot disks, IPv4, image/model egress, logging, Artifact Registry storage, Cloud Run and Cloud Tasks. Multiply by the provisioning-plus-experiment window and include cleanup delay. No estimate or available-credit claim is supplied by this preparation. Set a budget alert, but do not treat alerts or credits as a hard spending cap.
+Write down the current full session estimate: GKE management fee after applicable credits, N2 nodes, boot disks, IPv4, image/model egress, logging, Artifact Registry storage, Cloud Run and Cloud Tasks. Multiply by the provisioning-plus-experiment window and include cleanup delay. The first-session [trial and cost notes](gcp-trial.md) provide a budgetary estimate; refresh it for future runs. Do not treat budget alerts or credits as a hard spending cap.
 
 Two GKE nodes are fixed in one zone; there is no cluster autoscaler or GPU. Pool upgrades use zero surge and one unavailable node. GKE repair/replacement and deletion are asynchronous, so the configured count is not a contractual cost ceiling. Nodes have public egress addresses to download images/weights without a retained Cloud NAT. There are no public workload Services or inbound rules added by this code. The Kubernetes control plane uses a DNS endpoint with IAM access; IP endpoints are disabled. This tradeoff needs owner review.
 
@@ -75,7 +75,7 @@ kubectl -n inference-lab get rayservices,pods,services -o wide
 kubectl -n inference-lab port-forward service/inference-serve-svc 8000:8000
 ```
 
-The operator values use the chart's namespace list and namespaced RBAC. Validate the downloaded chart and RayService CRD schema at activation; these manifests were rendered locally and their Serve configuration checked with Ray's SDK, not installed on Kubernetes. Keep port-forwards bound to localhost.
+The operator values use the chart's namespace list and namespaced RBAC. Validate the downloaded chart and RayService CRD schema at activation. The RayService enables shared token authentication: KubeRay creates a Secret, injects it into head/workers and authenticates its management requests. Keep port-forwards bound to localhost and preserve management tokens as private credentials.
 
 The vLLM pod runs non-root without extra Linux capabilities. `nobind` disables CPU thread affinity in this lab. If the image requires different permissions, inspect the actual failure and make a narrow reviewed change; do not add privileged mode to get past a startup error. Test that its image layers fit the 30 GB boot disk, its writable caches fit the ephemeral allowance and its total memory fits 8 GiB. Container startup/download readiness can take minutes. Verify a real generation before benchmarking; `/healthz` on the proxy only checks the proxy.
 
