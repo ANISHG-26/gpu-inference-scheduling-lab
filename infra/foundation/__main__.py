@@ -23,6 +23,17 @@ registry = gcp.artifactregistry.Repository("lab", repository_id="inference-lab",
 node = gcp.serviceaccount.Account("node", account_id="inference-lab-node", opts=opts)
 expiry = gcp.serviceaccount.Account("expiry", account_id="inference-lab-expiry", opts=opts)
 invoker = gcp.serviceaccount.Account("task-invoker", account_id="inference-lab-task", opts=opts)
+build = gcp.serviceaccount.Account("build", account_id="inference-lab-build", opts=opts)
+build_source = gcp.storage.Bucket("build-source", name=f"{project}-build-source", location=region,
+    uniform_bucket_level_access=True, public_access_prevention="enforced", force_destroy=True,
+    lifecycle_rules=[{"action": {"type": "Delete"}, "condition": {"age": 1}}], opts=opts)
+gcp.storage.BucketIAMMember("build-source-read", bucket=build_source.name,
+    role="roles/storage.objectViewer", member=build.email.apply(lambda e: "serviceAccount:" + e), opts=opts)
+gcp.artifactregistry.RepositoryIamMember("build-push", project=project, location=region,
+    repository=registry.name, role="roles/artifactregistry.writer",
+    member=build.email.apply(lambda e: "serviceAccount:" + e), opts=opts)
+gcp.projects.IAMMember("build-logs", project=project, role="roles/logging.logWriter",
+    member=build.email.apply(lambda e: "serviceAccount:" + e), opts=opts)
 gcp.projects.IAMMember("node-runtime", project=project, role="roles/container.defaultNodeServiceAccount",
     member=node.email.apply(lambda e: "serviceAccount:" + e), opts=opts)
 gcp.artifactregistry.RepositoryIamMember("node-pull", project=project, location=region,
@@ -60,5 +71,6 @@ if cfg.get_bool("enableExpiry"):
 for key, value in {"projectId": project, "zone": zone, "networkId": network.id,
     "subnetId": subnet.id, "nodeServiceAccount": node.email, "expiryUrl": expiry_url,
     "taskQueueId": queue.name, "taskInvokerServiceAccount": invoker.email,
-    "registry": registry.id}.items():
+    "registry": registry.id, "buildSourceBucket": build_source.name,
+    "buildServiceAccount": build.email}.items():
     pulumi.export(key, value)

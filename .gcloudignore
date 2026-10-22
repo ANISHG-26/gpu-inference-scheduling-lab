@@ -1,0 +1,7 @@
+# Cloud Build receives only build inputs, never local credentials or Pulumi state.
+**
+!pyproject.toml
+!src/
+!src/**
+!containers/
+!containers/**

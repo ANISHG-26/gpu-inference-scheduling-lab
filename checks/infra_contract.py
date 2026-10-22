@@ -52,6 +52,13 @@ class Infrastructure(unittest.TestCase):
             self.assertEqual(queue["retryConfig"]["maxRetryDuration"], "86400s")
             self.assertEqual(queue["retryConfig"]["maxAttempts"], 100)
             self.assertFalse(any("RouterNat" in r.typ or "Firewall" in r.typ for r in RESOURCES))
+            bucket = next(r.inputs for r in RESOURCES if r.typ == "gcp:storage/bucket:Bucket")
+            self.assertEqual(bucket["publicAccessPrevention"], "enforced")
+            self.assertTrue(bucket["uniformBucketLevelAccess"])
+            self.assertEqual(bucket["lifecycleRules"][0]["condition"]["age"], 1)
+            build_grants = [r.inputs for r in RESOURCES
+                            if r.inputs.get("member") == "serviceAccount:test@example.invalid"]
+            self.assertFalse(any(v.get("role") in ("roles/editor", "roles/owner") for v in build_grants))
         return pulumi.Output.all(session["cluster"].urn, foundation["queue"].urn,
                                  foundation["service"].urn).apply(verify)
 
