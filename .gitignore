@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+kubeconfig*
+credentials*
+models/
+artifacts/
+results/local/
+.venv/
+__pycache__/
