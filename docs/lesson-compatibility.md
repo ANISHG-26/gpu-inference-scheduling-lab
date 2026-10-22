@@ -24,7 +24,22 @@ Image storage is not established for the proposed CPU `26.09-py3` or `26.09-py3-
 
 Minimum next checks: (1) select Python or ONNX and a tiny pinned model, with its Python ABI/opset; (2) resolve the 26.09 candidate manifest digest and measure compressed pull and extracted disk use on the target COS node/runtime; include model and writable-layer headroom; (3) run a CPU-only pod using non-root settings, explicit writable paths and a sized `/dev/shm`, then check readiness and valid/invalid inference; (4) if the full image does not fit, build and measure NVIDIA's documented minimal composition, still pinning digest. No measured result exists yet.
 
-## Readiness
+## Exact package and registry follow-up
+
+The official Slinky `slurm`, `slurm-operator`, and `slurm-operator-crds` **1.2.1** OCI charts were downloaded and rendered offline, without installation. A no-accounting/no-login render defines Controller, NodeSet and RestApi CRs; the expected initial workload is three pods with six app/init image slots, plus the operator. Controller persistence defaults to **4 GiB RWO** on the default StorageClass. Controller/worker/REST resource maps are empty, so the rendered chart supplies no defensible CPU/memory budget. The [tagged worker builder](https://github.com/SlinkyProject/slurm-operator/blob/v1.2.1/internal/builder/workerbuilder/worker_app.go) confirms `privileged: true` and BPF/NET_ADMIN/SYS_ADMIN/SYS_NICE in this release. The chart's default Slurm image tags and `alpine:latest` also need immutable image selection before activation. The default packaging does not pass the lab's baseline Pod Security policy.
+
+Anonymous NVIDIA registry manifest queries confirmed these **candidate** linux/amd64 identities; no layers were pulled and no image was selected for deployment:
+
+| 26.09 candidate | Platform manifest digest | Compressed layer bytes |
+| --- | --- | ---: |
+| `py3` | `sha256:1f08352ff9318894ca24bb36a532ad450b1289f7a6aeb163ae752a446c400fe6` | 9,043,508,064 (8.422 GiB) |
+| `py3-min` | `sha256:f5531a5cf882043ef41f9acec837666e04911c13dea6de45b5a96bf115ed902e` | 6,471,444,248 (6.027 GiB) |
+
+Compressed layer sums do **not** establish extracted/containerd disk fit or extraction headroom on a 30 GB boot disk. The release's Python backend uses Python 3.12; ONNX Runtime is listed as 1.30.0. NVIDIA's [compose guide](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/compose.html) explicitly says CPU-only containers are not yet available for customization. Selecting backends from the two NGC images does not establish a supported CPU-only minimal composition. A publisher-supported CPU source build is a separate evaluated option, not an implemented shortcut. Verify runtime, disk, shared memory and non-root behavior before final image selection.
+
+The newly provisioned inference test node reported Kubernetes `v1.36.4-gke.1495002`, COS and containerd 2.2.7. That Kubernetes version is inside Slinky 1.2.x's declared matrix. It does not establish privileged admission, writable child cgroups/systemd behavior or resource fit; those Slurm gates remain blocked.
+
+## Deployment decision
 
 **Neither stack is ready to deploy.** Slinky remains blocked on accepting/testing worker privilege and cgroup behavior on the exact GKE COS version, plus rendering and budgeting the minimal chart and storage. Triton remains blocked on resolving its exact digest, measuring extracted disk/model footprint, and validating non-root, shared-memory, and CPU backend operation. These are deployment blockers, not assumptions to fill with estimates.
 
