@@ -27,7 +27,7 @@ def pod(name, uid, role="model", node="node-a", *, ready=True, phase="Running", 
             "ray.io/node-type": "head" if role == "Ray head" else "worker",
             "ray.io/cluster": owner,
             "ray.io/serve": "true",
-            "is-ray-node": "yes",
+            "ray.io/is-ray-node": "yes",
         }
         kind = "RayCluster"
     meta = {"name": name, "uid": uid, "labels": labels,
@@ -39,6 +39,18 @@ def pod(name, uid, role="model", node="node-a", *, ready=True, phase="Running", 
 
 
 class OperatorHTTPTests(unittest.TestCase):
+    def test_observed_kuberay_namespaced_node_label_is_required(self):
+        observed = [pod('vllm-0', 'u0'), pod('head', 'h0', 'Ray head', owner='cluster'),
+                    pod('worker', 'w0', 'Ray worker', owner='cluster')]
+        for item in observed[1:]:
+            labels = item['metadata']['labels']
+            labels.pop('is-ray-node', None)
+            labels['ray.io/is-ray-node'] = 'yes'
+        self.assertTrue(operator._placement('01-single-node-inference', operator._safe_pods(observed))['valid'])
+        observed[1]['metadata']['labels'].pop('ray.io/is-ray-node')
+        observed[1]['metadata']['labels']['is-ray-node'] = 'yes'
+        self.assertFalse(operator._placement('01-single-node-inference', operator._safe_pods(observed))['valid'])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)

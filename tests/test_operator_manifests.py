@@ -43,6 +43,13 @@ class OperatorManifestTests(unittest.TestCase):
         self.assertFalse(any(rule.get("to") == [] or "to" not in rule for rule in egress))
         self.assertNotIn("0.0.0.0/0", str(egress))
 
+    def test_dns_allows_gke_dataplane_node_local_cache_pods(self):
+        policy = yaml.safe_load((ROOT / "k8s/operator/network.yaml").read_text())
+        peer = policy["spec"]["egress"][0]["to"][0]
+        self.assertEqual(peer["namespaceSelector"]["matchLabels"], {"kubernetes.io/metadata.name": "kube-system"})
+        self.assertIn({"key": "k8s-app", "operator": "In", "values": ["kube-dns", "node-local-dns"]},
+                      peer["podSelector"].get("matchExpressions", []))
+
 
 if __name__ == "__main__":
     unittest.main()

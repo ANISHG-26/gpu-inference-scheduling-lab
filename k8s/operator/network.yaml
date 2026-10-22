@@ -13,7 +13,9 @@ spec:
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: kube-system}
           podSelector:
-            matchLabels: {k8s-app: kube-dns}
+            # Dataplane V2 redirects the kube-dns Service to a regular cache pod.
+            matchExpressions:
+              - {key: k8s-app, operator: In, values: [kube-dns, node-local-dns]}
         - ipBlock: {cidr: 169.254.20.10/32} # GKE NodeLocal DNS if enabled
       ports:
         - {protocol: UDP, port: 53}

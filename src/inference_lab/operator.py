@@ -142,7 +142,7 @@ def _safe_pods(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "owner_kind": controller.get("kind"),
             "ray_cluster_label": labels.get("ray.io/cluster"),
             "ray_serve": labels.get("ray.io/serve"),
-            "is_ray_node": labels.get("is-ray-node"),
+            "is_ray_node": labels.get("ray.io/is-ray-node"),
         })
     return result
 
