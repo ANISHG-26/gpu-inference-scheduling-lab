@@ -20,6 +20,9 @@ for overlay, replicas in (("base", 1), ("two-nodes", 2)):
     assert spec["authOptions"]["mode"] == "token"
     assert spec["enableInTreeAutoscaling"] is False
     assert spec["headGroupSpec"]["serviceType"] == "ClusterIP"
+    head = spec["headGroupSpec"]["template"]["spec"]["containers"][0]
+    assert head["resources"]["requests"]["memory"] == "1Gi"
+    assert head["resources"]["limits"]["memory"] == "2Gi"
     assert spec["workerGroupSpecs"][0]["replicas"] == replicas
     serve = yaml.safe_load(ray["spec"]["serveConfigV2"])
     assert serve["http_options"]["request_timeout_s"] == 65
