@@ -33,7 +33,8 @@ assert args.tokenizer_revision == "c1899de289a04d12100db370d81485cdf75e47ca"
 assert args.dtype == "float32", args.dtype
 assert args.max_model_len == 1024, args.max_model_len
 assert args.max_num_seqs == 8, args.max_num_seqs
-assert args.kv_cache_memory_bytes == 1073741824, args.kv_cache_memory_bytes
+assert args.kv_cache_memory_bytes == 536870912, args.kv_cache_memory_bytes
+assert args.enforce_eager is True
 assert args.enable_log_requests is False, args.enable_log_requests
 print("Pinned vLLM serve command parsed and validated without loading a model.")
 """

@@ -13,6 +13,7 @@ for overlay, replicas in (("base", 1), ("two-nodes", 2)):
             assert obj["spec"].get("type", "ClusterIP") == "ClusterIP"
     model = next(o for o in objects if o["kind"] == "StatefulSet")
     assert model["spec"]["replicas"] == replicas
+    assert model["spec"]["template"]["spec"]["enableServiceLinks"] is False
     assert "requiredDuringSchedulingIgnoredDuringExecution" in model["spec"]["template"]["spec"]["affinity"]["podAntiAffinity"]
     ray = next(o for o in objects if o["kind"] == "RayService")
     spec = ray["spec"]["rayClusterConfig"]
