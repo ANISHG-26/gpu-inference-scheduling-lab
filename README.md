@@ -1,57 +1,48 @@
 # GPU Inference Scheduling Lab
 
-A portfolio project for studying how Kubernetes schedules and operates GPU inference workloads under contention.
+A CPU-first Kubernetes lab for learning inference infrastructure with GCP credits. Provision with **Pulumi Python**. Run a small model with vLLM, route requests through Ray Serve, and measure what happens under load and failure. GPU hardware, Triton and Slurm are later lessons.
 
-The deliverable is a reproducible cluster experiment with observable scheduling decisions, workload measurements, and an explanation of tradeoffs. A local model demo alone does not meet that goal.
-
-## Status
-
-Planning scaffold. No cluster, GPU workload, benchmark, or performance result has been delivered yet.
-
-## Questions to investigate
-
-- What happens when two workloads request an exclusive GPU and only one is available?
-- How do node labels, taints, tolerations, resource requests, and quotas constrain placement?
-- How do workload priority and pod preemption change placement and user-visible inference latency?
-- What changes when serving replicas share a GPU through supported time slicing, compared with exclusive allocation?
-- How do model loading, memory pressure, request queues, and restarts affect throughput and tail latency?
-
-Start with the standard scheduler and NVIDIA device plugin before deciding whether a custom scheduler is justified. Kubernetes pod placement, inference request scheduling, and distributed model execution are distinct layers.
-
-## Intended architecture
+Preparation in progress, October 22, 2026. No cloud resources have been created by this implementation. Offline tests are evidence about code behavior; real model execution, cloud expiry and cost remain activation checks. [Delivery evidence](docs/preparation.md) distinguishes them.
 
 ```mermaid
 flowchart LR
-  Load[Repeatable request load] --> Service[Inference service]
-  Service --> Pods[Model serving pods]
-  Scheduler[Kubernetes scheduler] --> Pods
-  Plugin[NVIDIA device plugin] --> GPU[GPU worker capacity]
-  Pods --> GPU
-  Pods --> Metrics[Request and model metrics]
-  Scheduler --> Events[Scheduling events]
-  GPU --> Metrics
-  Events --> Evidence[Experiment report]
-  Metrics --> Evidence
+  Operator[Operator: start / stop] --> Lifecycle[Python lifecycle controller]
+  Lifecycle --> Task[Register authenticated expiry task first]
+  Task --> Expiry[Cloud Run expiry worker]
+  Lifecycle --> Pulumi[Pulumi session: fixed CPU GKE]
+  Expiry --> Delete[Verify labels / delete exact session / verify absence]
+  Client[Bounded load tool] --> Access[kubectl port-forward]
+  subgraph GKE[One or two CPU nodes]
+    Access --> Ray[Ray Serve request replicas]
+    Ray --> Service[Private Kubernetes Service]
+    Service --> ModelA[vLLM: complete model copy A]
+    Service --> ModelB[Optional copy B on another node]
+  end
 ```
 
-## Delivery stages
+Kubernetes chooses pod placement. Ray chooses where its application replicas run and routes their work. The Kubernetes model Service distributes connections to ready vLLM pods. vLLM schedules tokens and manages the model's cache. These are separate scheduling layers: Ray does not own the vLLM pods or split the model across them.
 
-1. [Define hardware access and experiment boundaries](docs/experiment-plan.md).
-2. Prove exclusive GPU allocation and observable resource contention on a real GPU worker.
-3. Compare placement controls and pod priority with a fixed workload.
-4. Compare supported sharing with exclusive allocation, then investigate replica scaling if hardware permits.
-5. Publish commands, measured results, limitations, teardown, and a short demonstration.
+Start with the [plain-language architecture](docs/architecture.md), [deployment and shutdown runbook](docs/runbook.md), and [experiment worksheet](docs/experiments.md). The [source and license catalog](docs/cpu-poc-plan.md) explains the software choices. Fleet supplied lifecycle design patterns; [reuse provenance](docs/reuse.md) records the boundary.
 
-One GPU worker can prove scheduling contention. It cannot establish multi-GPU scaling or distributed inference performance. Simulated resources may help development but will be labeled as simulation.
+## Local preparation checks
 
-## Scope and infrastructure
+Python 3.12 and kubectl are required. No GCP credentials are needed for these checks.
 
-This repository is independent of other application projects. The target is cluster scheduling, inference operations, and evidence, rather than model training or application features.
+```sh
+python -m venv .venv
+# Activate .venv using your shell.
+python -m pip install -e '.[checks,serve]' -r infra/session/requirements.txt
+python -m unittest discover -s tests -v
+python checks/infra_contract.py -v
+python checks/manifests.py
+python checks/runtime_contract.py
+python checks/adapter_contract.py -v
+```
 
-Hardware/provider selection is pending. Google Cloud's unupgraded free trial does not allow adding GPUs to VM instances; see the [trial restrictions](https://docs.cloud.google.com/free/docs/free-cloud-features). A hosted model API also does not expose the provider's GPU scheduler. Design and simulation can proceed while access to a real GPU worker is resolved.
+`python checks/ray_smoke.py` additionally starts a local Ray cluster and an HTTP fixture on Linux. It exercises the serving integration, not a language model. Dockerfiles and a credentials-free PR workflow are included. Build the custom Ray image and replace `registry.invalid/inference-lab/ray:review-required` with its reviewed digest before deployment.
 
-Do not enable paid billing or provision resources from this scaffold. Any future provisioned environment needs an explicit resource limit, experiment window, cost estimate, teardown procedure, and owner approval of spending.
+## Delivery boundary
 
-## Evidence standard
+The first activation is a one-node baseline, followed by a new two-node session. Each node is `n2-standard-4` with a 30 GB standard disk; no autoscaling or GPUs. Actual schedulability and model/image compatibility must be measured. A deadline starts before provisioning and is limited to four hours. Cluster deletion removes the disposable session; registry storage and other foundation services remain and can incur charges.
 
-Record versions, hardware, workload settings, expected scheduling behavior, actual events, GPU-use evidence, cold/warm runs, latency distributions, throughput, errors, and limitations. Use a model that fits the selected hardware. Commit no credentials, account exports, model weights, or private recordings.
+Do not run provisioning until the owner reviews current trial entitlement, quotas, CPU compatibility, IAM and the full session cost. Use the [runbook](docs/runbook.md). The [original GPU experiment](docs/experiment-plan.md) and [GPU feasibility gate](docs/feasibility-gate.md) apply to later hardware work. This repository is independent of F0ToFret and Ottawa Fleet Platform.

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inference-lab"
+version = "0.1.0"
+description = "Bounded CPU inference experiments on Kubernetes"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+serve = ["ray[serve]==2.59.0", "httpx==0.28.1", "fastapi==0.159.1", "prometheus-client==0.26.0"]
+cloud = ["google-auth==2.62.0", "requests==2.34.2"]
+checks = ["PyYAML==6.0.3", "jsonschema==4.26.0"]
+
+[project.scripts]
+inference-lab = "inference_lab.lab:main"
+inference-benchmark = "inference_lab.benchmark:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

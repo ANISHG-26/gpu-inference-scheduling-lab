@@ -1,0 +1,75 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: inference
+spec:
+  serveConfigV2: |
+    proxy_location: EveryNode
+    http_options:
+      host: 0.0.0.0
+      port: 8000
+      request_timeout_s: 65
+    applications:
+      - name: inference
+        route_prefix: /
+        import_path: inference_lab.ray_app:app
+        deployments:
+          - name: InferenceAPI
+            num_replicas: 1
+            max_ongoing_requests: 8
+            max_queued_requests: 8
+            ray_actor_options:
+              num_cpus: 0.25
+  rayClusterConfig:
+    rayVersion: "2.59.0"
+    enableInTreeAutoscaling: false
+    headGroupSpec:
+      serviceType: ClusterIP
+      rayStartParams:
+        num-cpus: "0"
+        dashboard-host: "0.0.0.0"
+      template:
+        spec:
+          serviceAccountName: inference-lab
+          automountServiceAccountToken: false
+          containers:
+            - name: ray-head
+              image: registry.invalid/inference-lab/ray:review-required
+              env:
+                - {name: MODEL_ENDPOINT, value: "http://vllm:8000"}
+                - {name: MODEL_ID, value: Qwen/Qwen3-0.6B}
+              ports:
+                - {name: gcs, containerPort: 6379}
+                - {name: dashboard, containerPort: 8265}
+                - {name: serve, containerPort: 8000}
+              resources:
+                requests: {cpu: "250m", memory: 1Gi}
+                limits: {cpu: "500m", memory: 1Gi}
+    workerGroupSpecs:
+      - groupName: cpu
+        replicas: 1
+        minReplicas: 1
+        maxReplicas: 2
+        rayStartParams:
+          num-cpus: "1"
+        template:
+          metadata:
+            labels: {app: ray-worker}
+          spec:
+            serviceAccountName: inference-lab
+            automountServiceAccountToken: false
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - labelSelector:
+                      matchLabels: {app: ray-worker}
+                    topologyKey: kubernetes.io/hostname
+            containers:
+              - name: ray-worker
+                image: registry.invalid/inference-lab/ray:review-required
+                env:
+                  - {name: MODEL_ENDPOINT, value: "http://vllm:8000"}
+                  - {name: MODEL_ID, value: Qwen/Qwen3-0.6B}
+                resources:
+                  requests: {cpu: "750m", memory: 2Gi}
+                  limits: {cpu: "1", memory: 2Gi}

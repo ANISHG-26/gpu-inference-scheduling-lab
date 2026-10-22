@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+patches:
+  - target: {kind: StatefulSet, name: vllm}
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target: {kind: RayService, name: inference}
+    patch: |-
+      - op: replace
+        path: /spec/rayClusterConfig/workerGroupSpecs/0/replicas
+        value: 2
+  - target: {kind: RayService, name: inference}
+    patch: |-
+      - op: replace
+        path: /spec/serveConfigV2
+        value: |
+          proxy_location: EveryNode
+          http_options:
+            host: 0.0.0.0
+            port: 8000
+            request_timeout_s: 65
+          applications:
+            - name: inference
+              route_prefix: /
+              import_path: inference_lab.ray_app:app
+              deployments:
+                - name: InferenceAPI
+                  num_replicas: 2
+                  max_ongoing_requests: 8
+                  max_queued_requests: 8
+                  ray_actor_options:
+                    num_cpus: 0.25

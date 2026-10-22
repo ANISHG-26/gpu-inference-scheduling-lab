@@ -1,0 +1,16 @@
+# No public Services. Ray control ports are reachable only from this lab namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lab-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kuberay-system
+# Egress is intentionally open for pinned public model/image downloads. This is a
+# single-user lab namespace, not isolation between untrusted tenants.

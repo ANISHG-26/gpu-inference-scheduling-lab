@@ -1,0 +1,6 @@
+name: inference-lab-foundation
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: Retained network, registry and authenticated expiry service for the CPU lab
