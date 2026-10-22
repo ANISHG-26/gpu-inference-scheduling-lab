@@ -39,7 +39,7 @@
           <div class="section-title"><div><p class="eyebrow">CONTROLLED EXPERIMENT</p><h2>Run a small batch</h2></div><span class="fixed-batch">8 requests · 32 output tokens</span></div>
           <p class="muted">A bounded measurement against the active lesson. The request shape and endpoint are fixed.</p>
           <label class="field-label" for="concurrency">Concurrency</label>
-          <select id="concurrency" name="concurrency"><option value="1">1 worker</option><option value="2">2 workers</option><option value="4">4 workers</option><option value="8">8 workers</option></select>
+          <select id="concurrency" name="concurrency"><option value="1">1 in-flight request</option><option value="2">2 in-flight requests</option><option value="4">4 in-flight requests</option><option value="8">8 in-flight requests</option></select>
           <button id="run-button" class="primary-button" type="button" disabled>Run 8 requests</button>
           <p id="action-status" class="action-status" role="status" aria-live="polite">Waiting for a fresh session state.</p>
           <div id="experiment-result" class="experiment-result" aria-live="polite"></div>
