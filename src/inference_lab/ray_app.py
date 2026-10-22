@@ -31,6 +31,20 @@ SERVE_CONFIG = {
 api = FastAPI()
 
 
+@api.get("/healthz")
+async def healthz():
+    import ray
+
+    return await ray.serve.get_replica_context().servable_object.healthz()
+
+
+@api.post("/v1/chat/completions")
+async def chat_completions(request: Request):
+    import ray
+
+    return await ray.serve.get_replica_context().servable_object.chat_completions(request)
+
+
 @serve.deployment(max_ongoing_requests=BOUNDED_ONGOING_REQUESTS)
 @serve.ingress(api)
 class InferenceAPI:
@@ -54,11 +68,9 @@ class InferenceAPI:
             body = None
         return response.status_code, body
 
-    @api.get("/healthz")
     async def healthz(self):
         return {"status": "ok"}
 
-    @api.post("/v1/chat/completions")
     async def chat_completions(self, request: Request):
         body = bytearray()
         async for chunk in request.stream():
