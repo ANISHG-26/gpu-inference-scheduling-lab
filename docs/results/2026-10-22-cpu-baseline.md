@@ -31,4 +31,6 @@ Deleting the single model pod produced seven probes that reached their 15-second
 
 ## Remaining acceptance
 
-Actual scheduled cluster deletion remains to be verified. The authenticated expiry task was registered before provisioning and its original deadline was preserved through retries. The Cloud Tasks OIDC probe passed, but that is not proof of deleting a real cluster. Backing node/disk absence and retained foundation inventory must be recorded after shutdown. A later two-node session, Triton and Slurm remain separate experiments.
+Scheduled expiry was subsequently verified: the dedicated expiry identity initiated deletion at 16:28:01 UTC after the immutable 16:27:58 deadline. The GKE operation completed at 16:33:08. At 16:35:05 the API returned 404 and the owned instances, boot disks and managed groups were all absent; forwarding rules, reserved addresses and snapshots were also zero. No manual cloud-deletion fallback was used. Pulumi session state was reconciled only after absence verification. [Issue #1](https://github.com/ANISHG-26/gpu-inference-scheduling-lab/issues/1) records acceptance and closure.
+
+The network/subnet, scoped identities, registry images, private source bucket with one-day deletion lifecycle, task queue and scale-to-zero expiry service remain. Retained storage/requests/logs may still cost; no final billing total is claimed. A later two-node session, cluster console, Triton and Slurm remain separate experiments.

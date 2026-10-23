@@ -5,3 +5,7 @@
 !src/**
 !containers/
 !containers/**
+!operator/
+!operator/static/
+!operator/static/**
+**/__pycache__

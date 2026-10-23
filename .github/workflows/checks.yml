@@ -31,6 +31,15 @@ jobs:
         with:
           persist-credentials: false
       - run: docker build -f containers/expiry.Dockerfile -t inference-lab-expiry:check .
+  operator-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - run: docker build -f containers/operator.Dockerfile -t inference-lab-operator:check .
+      - run: docker run --rm --read-only inference-lab-operator:check python -c 'import os; assert os.getuid() != 0; from inference_lab.operator import state; assert state()["session"]["status"] == "unconfigured"'
   ray-image:
     runs-on: ubuntu-latest
     timeout-minutes: 20

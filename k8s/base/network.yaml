@@ -4,7 +4,9 @@ kind: NetworkPolicy
 metadata:
   name: lab-ingress
 spec:
-  podSelector: {}
+  podSelector:
+    matchExpressions:
+      - {key: app, operator: NotIn, values: [lab-operator]}
   policyTypes: [Ingress]
   ingress:
     - from:

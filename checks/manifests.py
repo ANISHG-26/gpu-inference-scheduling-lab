@@ -27,5 +27,13 @@ for overlay, replicas in (("base", 1), ("two-nodes", 2)):
     serve = yaml.safe_load(ray["spec"]["serveConfigV2"])
     assert serve["http_options"]["request_timeout_s"] == 65
     assert serve["applications"][0]["deployments"][0]["num_replicas"] == replicas
+    if replicas == 2:
+        assert serve["applications"][0]["deployments"][0].get("max_replicas_per_node") == 1, "Two-node Serve replicas must occupy distinct Ray nodes"
     assert not any("nvidia.com/gpu" in json.dumps(o) for o in objects)
     print(f"{overlay}: {len(objects)} resources; {replicas} model and Serve replica(s); private Services")
+
+operator = list(yaml.safe_load_all(subprocess.check_output(
+    ["kubectl", "kustomize", str(ROOT / "k8s/operator")], text=True)))
+assert all(o["metadata"]["namespace"] == "inference-lab" for o in operator)
+assert {o["kind"] for o in operator} == {"ServiceAccount", "Role", "RoleBinding", "Service", "Deployment", "NetworkPolicy"}
+print(f"operator: {len(operator)} namespaced resources; optional, fail-closed template")

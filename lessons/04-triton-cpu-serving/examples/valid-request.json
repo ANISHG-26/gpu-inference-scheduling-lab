@@ -1,0 +1,1 @@
+{"inputs":[{"name":"INPUT","shape":[1,4],"datatype":"FP32","data":[1,2,3,4]}],"outputs":[{"name":"OUTPUT"}]}

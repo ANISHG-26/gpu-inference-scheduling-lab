@@ -72,6 +72,100 @@ class BenchmarkServer:
 
 
 class BenchmarkTests(unittest.TestCase):
+    def test_slow_dribble_response_obeys_total_request_deadline(self):
+        payload = b'{"choices":[{"message":{"content":"ok"}}]}'
+
+        class SlowDribbleHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                try:
+                    for byte in payload:
+                        self.wfile.write(bytes([byte]))
+                        self.wfile.flush()
+                        threading.Event().wait(0.02)
+                except OSError:
+                    pass
+
+            def log_message(self, *_args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), SlowDribbleHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            report = run_benchmark(
+                f"http://127.0.0.1:{server.server_port}", requests=1, timeout=0.08
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1)
+
+        metric = report["requests"][0]
+        self.assertEqual(metric["error"], "timeout")
+        self.assertLess(metric["elapsed_seconds"], 0.25)
+
+    def test_oversized_success_is_not_accepted_and_read_is_bounded(self):
+        payload = b" " * 65537
+
+        class OversizedHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def log_message(self, *_args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), OversizedHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            report = run_benchmark(f"http://127.0.0.1:{server.server_port}", requests=1)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1)
+        self.assertEqual(report["summary"]["completed"], 0)
+        self.assertEqual(report["requests"][0]["error"], "invalid_response")
+
+    def test_redirect_is_not_followed(self):
+        visited = []
+
+        class RedirectHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                visited.append(self.path)
+                self.send_response(302)
+                self.send_header("Location", "/unexpected")
+                self.end_headers()
+
+            def do_GET(self):
+                visited.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"choices":[{"message":{"content":"redirected"}}]}')
+
+            def log_message(self, *_args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), RedirectHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            report = run_benchmark(f"http://127.0.0.1:{server.server_port}", requests=1)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=1)
+        self.assertEqual(visited, ["/v1/chat/completions"])
+        self.assertEqual(report["summary"]["completed"], 0)
+
     def test_local_server_records_success_timeout_and_http_error_without_contents(self):
         with BenchmarkServer() as server:
             report = run_benchmark(
