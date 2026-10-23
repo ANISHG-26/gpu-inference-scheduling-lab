@@ -30,6 +30,7 @@ patches:
               deployments:
                 - name: InferenceAPI
                   num_replicas: 2
+                  max_replicas_per_node: 1
                   max_ongoing_requests: 8
                   max_queued_requests: 8
                   ray_actor_options:
