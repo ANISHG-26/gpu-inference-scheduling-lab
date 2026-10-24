@@ -16,7 +16,7 @@ from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 
-from . import benchmark
+from . import benchmark, triton
 
 
 NAMESPACE = "inference-lab"
@@ -31,7 +31,8 @@ EXPERIMENT_TIMEOUT = 65
 EXPERIMENT_URL = "http://inference-serve-svc.inference-lab.svc.cluster.local:8000"
 STATIC_ROOT = Path(os.environ.get("OPERATOR_STATIC_ROOT", "/app/operator/static"))
 STATIC_FILES = {"/": "index.html", "/app.js": "app.js", "/style.css": "style.css"}
-LESSON_IDS = {"01-single-node-inference", "02-two-node-inference"}
+TRITON_LESSON = "04-triton-cpu-serving"
+LESSON_IDS = {"01-single-node-inference", "02-two-node-inference", TRITON_LESSON}
 CONCURRENCY_OPTIONS = {1, 2, 4, 8}
 DNS1123_LABEL = re.compile(r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$")
 EXPERIMENT_LOCK = threading.Lock()
@@ -42,6 +43,29 @@ EXPERIMENT_RUNNING = False
 def _catalog() -> tuple[dict[str, Any], ...]:
     from .lessons import CATALOG
     return CATALOG
+
+
+def _lesson_gate_open(lesson_id: str) -> bool:
+    return any(lesson['id'] == lesson_id and lesson.get('gate') is None for lesson in _catalog())
+
+
+def _experiment_input(payload: Any) -> tuple[str, int, int | None] | None:
+    if not isinstance(payload, dict):
+        return None
+    lesson_id = payload.get('lesson_id')
+    if not isinstance(lesson_id, str) or lesson_id not in LESSON_IDS:
+        return None
+    concurrency = payload.get('concurrency')
+    if type(concurrency) is not int or concurrency not in CONCURRENCY_OPTIONS:
+        return None
+    if lesson_id == TRITON_LESSON:
+        batch_size = payload.get('batch_size')
+        if set(payload) != {'lesson_id', 'concurrency', 'batch_size'} or type(batch_size) is not int or batch_size not in CONCURRENCY_OPTIONS:
+            return None
+        return lesson_id, concurrency, batch_size
+    if set(payload) != {'lesson_id', 'concurrency'}:
+        return None
+    return lesson_id, concurrency, None
 
 
 def _active_lesson() -> str | None:
@@ -119,6 +143,8 @@ def _safe_pods(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         labels = _labels(pod)
         if labels.get("app") == "vllm":
             role = "model"
+        elif labels.get("app") == "triton":
+            role = "Triton model"
         elif labels.get("ray.io/node-type") == "head":
             role = "Ray head"
         elif labels.get("ray.io/node-type") == "worker":
@@ -171,6 +197,16 @@ def _expected_counts(lesson_id: str) -> tuple[int, int, int]:
 def _placement(lesson_id: str | None, items: list[dict[str, Any]]) -> dict[str, Any]:
     if lesson_id is None:
         return {"valid": False, "reason": "No active lesson is configured."}
+    if lesson_id == TRITON_LESSON:
+        models = [p for p in items if p['role'] == 'Triton model']
+        other = [p for p in items if p['role'] in {'model', 'Ray head', 'Ray worker'}]
+        if other or len(models) != 1:
+            return {'valid': False, 'reason': 'Waiting for only one Triton model pod; lessons run sequentially.'}
+        pod = models[0]
+        if (pod['name'] != 'triton-0' or pod['owner_kind'] != 'StatefulSet' or pod['owner'] != 'triton'
+                or not pod['uid'] or not pod['node'] or not pod['ready'] or pod['phase'] != 'Running' or pod['terminating']):
+            return {'valid': False, 'reason': 'Waiting for Ready triton-0 owned by StatefulSet triton.'}
+        return {'valid': True, 'reason': 'The Triton model pod is Ready on its assigned node.', 'model_nodes': [pod['node']]}
     model_candidates = [p for p in items if p["role"] == "model"]
     head_candidates = [p for p in items if p["role"] == "Ray head"]
     worker_candidates = [p for p in items if p["role"] == "Ray worker"]
@@ -219,7 +255,8 @@ def _placement(lesson_id: str | None, items: list[dict[str, Any]]) -> dict[str, 
 
 
 def _serving_uids(lesson_id: str, pods: list[dict[str, Any]]) -> set[str]:
-    selected = [p for p in pods if not p["terminating"] and p["role"] in {"model", "Ray head", "Ray worker"}]
+    roles = {'Triton model'} if lesson_id == TRITON_LESSON else {'model', 'Ray head', 'Ray worker'}
+    selected = [p for p in pods if not p["terminating"] and p["role"] in roles]
     uids = {p["uid"] for p in selected if p["uid"]}
     return uids if len(uids) == len(selected) else set()
 
@@ -291,7 +328,7 @@ def state() -> dict[str, Any]:
                             EXPERIMENT["state"] = "failed"
                             EXPERIMENT["error"] = stale_reason
             if observation["status"] == "ok" and any(
-                p["role"] in {"model", "Ray head", "Ray worker"} and p["phase"] == "Failed" and not p["terminating"]
+                p["role"] in {"model", "Ray head", "Ray worker", "Triton model"} and p["phase"] == "Failed" and not p["terminating"]
                 for p in observation["pods"]
             ):
                 item["state"] = "failed"
@@ -334,27 +371,42 @@ def _has_inference_evidence(metrics: list[dict[str, Any]]) -> bool:
     )
 
 
-def _run_experiment(experiment_id: str, lesson_id: str, concurrency: int, before: set[str]) -> None:
+def _triton_summary(value: dict[str, Any]) -> dict[str, Any]:
+    def seconds(key: str) -> float | None:
+        number = value.get(key)
+        return number / 1000 if type(number) in {int, float} else None
+    return {'completed': value.get('completed', 0), 'errors': value.get('errors', 0),
+            'requests_completed': value.get('requests_completed', 0), 'request_errors': value.get('request_errors', 0),
+            'p50_latency_seconds': seconds('p50_ms'), 'p95_latency_seconds': seconds('p95_ms'),
+            'wall_time_seconds': value.get('wall_seconds'), 'inferences_per_second': value.get('inferences_per_second')}
+
+
+def _run_experiment(experiment_id: str, lesson_id: str, concurrency: int, before: set[str], batch_size: int | None = None) -> None:
     global EXPERIMENT, EXPERIMENT_RUNNING
     started = int(time.time())
     metrics: list[dict[str, Any]] = []
     wall_started = time.perf_counter()
     summary: dict[str, Any] | None = None
+    triton_result: dict[str, Any] | None = None
     try:
         total = 8
-        remaining = total
-        index = 1
-        while remaining:
-            if _session()["status"] != "active":
-                raise RuntimeError("session_expired")
-            count = min(remaining, concurrency)
-            report = benchmark.run_benchmark(EXPERIMENT_URL, requests=count, concurrency=concurrency, max_tokens=32, timeout=EXPERIMENT_TIMEOUT)
-            for metric in report.get("requests", []):
-                metric["request"] = index
-                index += 1
-                metrics.append(metric)
-            remaining -= count
-        summary = benchmark.summarize(metrics, time.perf_counter() - wall_started)
+        if lesson_id == TRITON_LESSON:
+            triton_result = triton.run_experiment(concurrency, batch_size, lambda: _session()['status'] == 'active')
+            summary = _triton_summary(triton_result['summary'])
+        else:
+            remaining = total
+            index = 1
+            while remaining:
+                if _session()["status"] != "active":
+                    raise RuntimeError("session_expired")
+                count = min(remaining, concurrency)
+                report = benchmark.run_benchmark(EXPERIMENT_URL, requests=count, concurrency=concurrency, max_tokens=32, timeout=EXPERIMENT_TIMEOUT)
+                for metric in report.get("requests", []):
+                    metric["request"] = index
+                    index += 1
+                    metrics.append(metric)
+                remaining -= count
+            summary = benchmark.summarize(metrics, time.perf_counter() - wall_started)
         after = _snapshot()
         after_ids = _serving_uids(lesson_id, after["pods"]) if after["status"] == "ok" else set()
         if _session()["status"] != "active":
@@ -365,13 +417,22 @@ def _run_experiment(experiment_id: str, lesson_id: str, concurrency: int, before
             error = "placement_unready"
         elif not before or before != after_ids:
             error = "pod_identity_changed"
+        elif triton_result is not None and triton_result.get('error'):
+            error = 'metrics_unverified' if str(triton_result['error']).startswith('metrics_unverified:') else 'triton_protocol_failed'
         elif summary.get("completed") != total:
             error = "requests_failed"
-        elif not _has_inference_evidence(metrics):
+        elif triton_result is None and not _has_inference_evidence(metrics):
             error = "inference_evidence_missing"
         else:
             error = None
         result = {"id": experiment_id, "lesson_id": lesson_id, "state": "measured" if error is None else "failed", "concurrency": concurrency, "started_at": started, "finished_at": int(time.time()), "summary": summary, "error": error, "identity_note": "Topology pod UIDs matched before and after; per-request model identity is unknown for balanced inference." if after["status"] == "ok" and before == after_ids else "Pod identity could not be verified.", "pod_uids": before}
+        if triton_result is not None:
+            details = triton_result['triton']
+            delta = details.get('counter_deltas') or {}
+            executions = delta.get('execution_count')
+            details['mean_batch_size'] = delta.get('inference_count', 0) / executions if type(executions) is int and executions > 0 else None
+            result.update({'adapter': 'triton', 'batch_size': batch_size, 'triton': details,
+                           'identity_note': 'The Triton pod UID matched before and after; protocol checks are reported separately.' if after['status'] == 'ok' and before == after_ids else 'Pod identity could not be verified.'})
     except Exception as exc:
         reason = str(exc) if str(exc) == "session_expired" else "experiment_unavailable"
         if metrics:
@@ -512,15 +573,11 @@ class OperatorHandler(BaseHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
             self._send(400, {"error": "invalid_json"})
             return
-        if not isinstance(payload, dict) or set(payload) != {"lesson_id", "concurrency"}:
+        parsed_input = _experiment_input(payload)
+        if parsed_input is None:
             self._send(400, {"error": "invalid_request"})
             return
-        lesson_id, concurrency = payload["lesson_id"], payload["concurrency"]
-        if (not isinstance(lesson_id, str) or lesson_id not in LESSON_IDS
-                or isinstance(concurrency, bool) or not isinstance(concurrency, int)
-                or concurrency not in CONCURRENCY_OPTIONS):
-            self._send(400, {"error": "invalid_request"})
-            return
+        lesson_id, concurrency, batch_size = parsed_input
         if os.environ.get("LAB_ACTIONS_ENABLED", "false").lower() != "true":
             self._send(403, {"error": "actions_disabled"})
             return
@@ -528,7 +585,10 @@ class OperatorHandler(BaseHTTPRequestHandler):
         if _active_lesson() != lesson_id or session["status"] != "active":
             self._send(503, {"error": "lesson_unavailable"})
             return
-        remaining_required = ((8 + concurrency - 1) // concurrency) * (EXPERIMENT_TIMEOUT + 0) + 30
+        if not _lesson_gate_open(lesson_id):
+            self._send(503, {'error': 'lesson_unavailable'})
+            return
+        remaining_required = triton.required_seconds(concurrency, batch_size) if lesson_id == TRITON_LESSON else ((8 + concurrency - 1) // concurrency) * EXPERIMENT_TIMEOUT + 30
         if (session["remaining_seconds"] or 0) < remaining_required:
             self._send(503, {"error": "insufficient_session_time"})
             return
@@ -548,9 +608,12 @@ class OperatorHandler(BaseHTTPRequestHandler):
                 return
             experiment_id = f"experiment-{int(time.time())}-{threading.get_ident()}"
             experiment = {"id": experiment_id, "lesson_id": lesson_id, "state": "running", "concurrency": concurrency, "started_at": int(time.time()), "finished_at": None, "summary": None, "error": None, "identity_note": "Kubernetes serving workload pod UIDs captured before the experiment.", "pod_uids": uids}
+            if lesson_id == TRITON_LESSON:
+                experiment.update({'adapter': 'triton', 'batch_size': batch_size})
             EXPERIMENT = experiment
             EXPERIMENT_RUNNING = True
-        threading.Thread(target=_run_experiment, args=(experiment_id, lesson_id, concurrency, uids), daemon=True).start()
+        args = (experiment_id, lesson_id, concurrency, uids, batch_size) if lesson_id == TRITON_LESSON else (experiment_id, lesson_id, concurrency, uids)
+        threading.Thread(target=_run_experiment, args=args, daemon=True).start()
         self._send(202, _public_experiment(experiment))
 
     def log_message(self, *_args: Any) -> None:
