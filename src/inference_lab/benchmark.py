@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import http.client
 import json
 import math
 from pathlib import Path
-import socket
-import threading
 import time
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
+
+from inference_lab.bounded_http import request as bounded_request
 
 
 MODEL_ID = "Qwen/Qwen3-0.6B"
@@ -49,63 +48,25 @@ def _valid_token_count(value: Any) -> bool:
 
 
 def _request_once(index: int, endpoint: str, max_tokens: int, timeout: float) -> dict[str, Any]:
-    body = json.dumps(
-        {
-            "model": MODEL_ID,
-            "messages": [{"role": "user", "content": PROMPT}],
-            "max_tokens": max_tokens,
-            "stream": False,
-        }
-    ).encode("utf-8")
     started = time.perf_counter()
     status = None
     error = None
     prompt_tokens = None
     completion_tokens = None
     completed = False
-    connection = None
-    response = None
-    timer = None
-    deadline_fired = threading.Event()
     try:
-        parsed = urlsplit(endpoint)
-        connection_type = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
-        connection = connection_type(parsed.hostname, parsed.port, timeout=timeout)
-        # socket.create_connection's timeout bounds connect, though Python cannot
-        # interrupt a stalled DNS lookup. The elapsed budget below covers the
-        # request once connected.
-        connection.connect()
-        request_socket = connection.sock
-        remaining = timeout - (time.perf_counter() - started)
-        if remaining <= 0:
-            raise socket.timeout("request deadline exceeded")
-        request_socket.settimeout(remaining)
-
-        def interrupt_request():
-            deadline_fired.set()
-            try:
-                request_socket.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-
-        timer = threading.Timer(remaining, interrupt_request)
-        timer.daemon = True
-        timer.start()
-        target = parsed.path or "/"
-        connection.request(
+        status, response_body = bounded_request(
             "POST",
-            target,
-            body=body,
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            endpoint,
+            json_body={
+                "model": MODEL_ID,
+                "messages": [{"role": "user", "content": PROMPT}],
+                "max_tokens": max_tokens,
+                "stream": False,
+            },
+            timeout=timeout,
+            max_bytes=MAX_RESPONSE_BYTES,
         )
-        response = connection.getresponse()
-        status = response.status
-        if 200 <= status < 300:
-            response_body = response.read(MAX_RESPONSE_BYTES + 1)
-            if deadline_fired.is_set() or time.perf_counter() - started > timeout:
-                raise socket.timeout("request deadline exceeded")
-        else:
-            response_body = b""
         if 200 <= status < 300:
             try:
                 decoded = json.loads(response_body) if len(response_body) <= MAX_RESPONSE_BYTES else None
@@ -132,17 +93,10 @@ def _request_once(index: int, endpoint: str, max_tokens: int, timeout: float) ->
                         completion_tokens = completion_value
         else:
             error = "http_error"
-    except (TimeoutError, socket.timeout):
+    except TimeoutError:
         error = "timeout"
-    except (http.client.HTTPException, OSError, ValueError):
-        error = "timeout" if deadline_fired.is_set() or time.perf_counter() - started >= timeout else "connection_error"
-    finally:
-        if timer is not None:
-            timer.cancel()
-        if response is not None:
-            response.close()
-        if connection is not None:
-            connection.close()
+    except (OSError, ValueError):
+        error = "connection_error"
 
     metric = {
         "request": index,

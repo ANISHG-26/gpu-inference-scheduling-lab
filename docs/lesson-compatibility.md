@@ -45,6 +45,8 @@ The newly provisioned inference test node reported Kubernetes `v1.36.4-gke.14950
 
 ## Deployment decision
 
+A bounded candidate pull on October 23, 2026 was aborted before Triton became Ready: the 30 GB node crossed the predeclared 20% available-filesystem reserve during pull/unpack. The workload and disposable session were removed. This is a failed disk-reserve gate, not a measurement of final extracted image size or CPU backend operation. No image was selected or pinned for the lesson. The adapter and console controls remain prepared and disabled; a supported CPU source build or a separately reviewed resource plan is still needed before another runtime attempt.
+
 **Neither stack is ready to deploy.** Slinky remains blocked on accepting/testing worker privilege and cgroup behavior on the exact GKE COS version, plus assigning resources to the rendered minimal chart and validating storage. Triton's candidate manifest digests are resolved; final image selection remains blocked on measuring extracted disk/model footprint and validating non-root, shared-memory, and CPU backend operation. CPU-only composition is unavailable in the current documented flow. These are deployment blockers, not assumptions to fill with estimates.
 
 ## Primary sources
