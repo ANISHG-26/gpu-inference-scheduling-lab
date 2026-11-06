@@ -12,6 +12,7 @@ import socket
 import ssl
 import threading
 import time
+import uuid
 from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
@@ -606,7 +607,7 @@ class OperatorHandler(BaseHTTPRequestHandler):
             if EXPERIMENT_RUNNING:
                 self._send(409, {"error": "experiment_running"})
                 return
-            experiment_id = f"experiment-{int(time.time())}-{threading.get_ident()}"
+            experiment_id = f"experiment-{uuid.uuid4().hex}"
             experiment = {"id": experiment_id, "lesson_id": lesson_id, "state": "running", "concurrency": concurrency, "started_at": int(time.time()), "finished_at": None, "summary": None, "error": None, "identity_note": "Kubernetes serving workload pod UIDs captured before the experiment.", "pod_uids": uids}
             if lesson_id == TRITON_LESSON:
                 experiment.update({'adapter': 'triton', 'batch_size': batch_size})

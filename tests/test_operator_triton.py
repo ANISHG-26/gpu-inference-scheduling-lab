@@ -2,6 +2,7 @@
 import os
 import http.client
 import json
+import socket
 import threading
 import time
 from pathlib import Path
@@ -98,6 +99,46 @@ class TritonAdmissionHTTPTests(unittest.TestCase):
         self.assertEqual(state['summary']['p50_latency_seconds'], .002)
         self.assertNotIn('completion_tokens_per_second', state['summary'])
         self.assertEqual(state['triton']['mean_batch_size'], 4)
+
+    def test_sequential_admissions_get_distinct_ids_with_same_clock_and_thread(self):
+        catalog = tuple({**item, 'gate': None} if item['id'] == LESSON else item for item in operator._catalog())
+        result = {'summary': {'completed': 4, 'errors': 0, 'requests_completed': 1, 'request_errors': 0,
+                  'p50_ms': 2.0, 'p95_ms': 3.0, 'wall_seconds': .02, 'inferences_per_second': 200},
+                  'triton': {'counter_deltas': {'success': 1, 'inference_count': 4, 'execution_count': 1}}, 'error': None}
+        fixed_now = int(time.time())
+        ids = []
+        with patch.object(operator, '_catalog', return_value=catalog), \
+                patch.object(operator.triton, 'run_experiment', return_value=result), \
+                patch.object(operator.time, 'time', return_value=fixed_now):
+            for _ in range(2):
+                client, server_socket = socket.socketpair()
+                client.settimeout(2)
+                server_socket.settimeout(2)
+                payload = json.dumps({'lesson_id': LESSON, 'concurrency': 4, 'batch_size': 4}).encode()
+                request = (b'POST /api/experiments HTTP/1.1\r\n'
+                           + f'Host: 127.0.0.1:{self.port}\r\n'.encode()
+                           + f'Origin: http://127.0.0.1:{self.port}\r\n'.encode()
+                           + b'Content-Type: application/json\r\n'
+                           + f'Content-Length: {len(payload)}\r\n'.encode()
+                           + b'Connection: close\r\n\r\n' + payload)
+                client.sendall(request)
+                try:
+                    operator.OperatorHandler(server_socket, ('127.0.0.1', 1), self.server)
+                    response = http.client.HTTPResponse(client)
+                    response.begin()
+                    status = response.status
+                    value = json.loads(response.read())
+                    response.close()
+                finally:
+                    server_socket.close()
+                    client.close()
+                self.assertEqual(status, 202)
+                ids.append(value['id'])
+                deadline = time.monotonic() + 2
+                while operator.EXPERIMENT_RUNNING and time.monotonic() < deadline:
+                    time.sleep(.01)
+                self.assertFalse(operator.EXPERIMENT_RUNNING)
+        self.assertNotEqual(ids[0], ids[1])
 
 
 if __name__ == '__main__':
