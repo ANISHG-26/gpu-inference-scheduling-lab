@@ -1,0 +1,89 @@
+# Offline planning overlay for the mutually matched Slinky 1.2.1 chart set.
+# This is not an install-ready profile. Default image tags remain unselected;
+# choose and pin immutable images before any authorized activation.
+
+accounting:
+  enabled: false
+
+loginsets: {}
+
+controller:
+  persistence:
+    enabled: false
+  slurmctld:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  reconfigure:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  logfile:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+
+restapi:
+  replicas: 1
+  service:
+    spec:
+      type: ClusterIP
+  slurmrestd:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+nodesetDefaults:
+  enabled: true
+  scalingMode: StatefulSet
+  replicas: 1
+  extraConfMap:
+    CPUs: "2"
+  slurmd:
+    resources:
+      requests:
+        cpu: "2"
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+  logfile:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+  partition:
+    enabled: true
+    configMap:
+      Default: "YES"
+      MaxTime: "00:01:00"
+
+nodesets:
+  lesson:
+    enabled: true
+    replicas: 1
+
+# The NodeSet creates the single named, default lesson partition above.
+# Disable the chart's separate example `all` partition to avoid a second queue.
+partitions:
+  all:
+    enabled: false
