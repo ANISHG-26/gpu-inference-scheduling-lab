@@ -68,10 +68,17 @@ class TritonManifestTests(unittest.TestCase):
             "requests": {"cpu": "1", "memory": "3Gi", "ephemeral-storage": "128Mi"},
             "limits": {"cpu": "2", "memory": "4Gi", "ephemeral-storage": "1Gi"},
         })
-        mounts = {m["name"]: m for m in container["volumeMounts"]}
-        self.assertTrue(mounts["model"]["readOnly"])
-        self.assertEqual(mounts["model"]["mountPath"], "/models")
-        self.assertEqual({n: mounts[n]["mountPath"] for n in ("tmp", "shm")}, {
+        mounts = container["volumeMounts"]
+        model_mounts = [m for m in mounts if m["name"] == "model"]
+        self.assertEqual(model_mounts, [
+            {"name": "model", "mountPath": "/models/lab_double/config.pbtxt",
+             "subPath": "lab_double/config.pbtxt", "readOnly": True},
+            {"name": "model", "mountPath": "/models/lab_double/1/model.py",
+             "subPath": "lab_double/1/model.py", "readOnly": True},
+        ])
+        self.assertFalse(any(m["mountPath"] == "/models" for m in mounts))
+        by_name = {m["name"]: m for m in mounts if m["name"] != "model"}
+        self.assertEqual({n: by_name[n]["mountPath"] for n in ("tmp", "shm")}, {
             "tmp": "/tmp", "shm": "/dev/shm",
         })
         volumes = {v["name"]: v for v in pod["volumes"]}
