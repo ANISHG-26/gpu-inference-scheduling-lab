@@ -43,7 +43,7 @@
           <div id="triton-controls" hidden>
             <label class="field-label" for="batch-size">Batch size</label>
             <select id="batch-size" name="batch_size" disabled><option value="1">1 item per request</option><option value="2">2 items per request</option><option value="4">4 items per request</option><option value="8">8 items per request</option></select>
-            <p class="muted small">8 input items total; each request carries 8 ÷ batch size items. Model version 1 is fixed.</p>
+            <p class="muted small">8 input items total; request count = 8 ÷ batch size. Model version 1 is fixed.</p>
           </div>
           <button id="run-button" class="primary-button" type="button" disabled>Run 8 requests</button>
           <p id="action-status" class="action-status" role="status" aria-live="polite">Waiting for a fresh session state.</p>
@@ -63,7 +63,7 @@
         <div class="section-title"><div><p class="eyebrow">LIVE OBSERVATION</p><h2>Pod placement</h2></div><span id="observation-time" class="observation-time">Not yet observed</span></div>
         <p id="placement-summary" class="placement-summary">Waiting for a Kubernetes observation.</p>
         <div class="table-wrap"><table><thead><tr><th scope="col">Pod</th><th scope="col">UID</th><th scope="col">Node</th><th scope="col">Role</th><th scope="col">Phase</th><th scope="col">Ready</th></tr></thead><tbody id="pod-rows"><tr><td colspan="6" class="empty-cell">No current pod observation.</td></tr></tbody></table></div>
-        <p class="identity-note">Ray node identity describes the scheduling layer; it does not identify which model-serving pod handled a request. This table is an API observation, and the balanced request model pod is unknown.</p>
+        <p class="identity-note" id="placement-identity-note">Pod identities and placement are current Kubernetes API observations.</p>
       </section>
 
       <section class="card reflection-card">
