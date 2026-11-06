@@ -1,23 +1,21 @@
 # 04 — NVIDIA Triton Inference Server on CPU
 
-Prepared teaching inputs, isolated Kubernetes workload, fixed protocol adapter and console controls. This is NVIDIA's inference server, distinct from the Triton kernel language. The [compatibility note](../../docs/lesson-compatibility.md) records candidate image identities and unresolved runtime acceptance gates. No deployable image is selected and the catalog gate keeps the adapter disabled.
+This lesson serves a tiny deterministic model through NVIDIA Triton Inference Server. It teaches model repositories, numeric versions, tensor contracts, batching and metrics. The model doubles FP32 values; it is not a learned model or an LLM benchmark.
 
-The tiny `model-repository/lab_double` model deterministically doubles FP32 inputs on CPU. It teaches repositories, numeric versions, tensor contracts, dynamic batching and metrics; it is not a learned model or an LLM benchmark. Version 1 is the only prepared version. The `version_policy` is explicit. The Python model imports the server-supplied Python backend utility only when run inside the eventual compatible Triton runtime. Source model behavior tests use a clearly labelled utility fixture and do not prove backend compatibility.
+The pinned 26.09 runtime has passed real CPU readiness, correct tensor output, wrong-shape and missing-version errors, non-root execution, Python 3.12 linkage,128 MiB shared memory and the disk-reserve checks on the reviewed80 GB node. The [compatibility assessment](../../docs/lesson-compatibility.md) distinguishes that runtime evidence from the historical image evaluations. Console experiments and current deployment state are separate observations.
 
-Predict the output and shape for `examples/valid-request.json`, then predict why `invalid-request.json` should fail. After compatibility acceptance, use fixed model/version adapters for readiness, valid/invalid requests, version selection and metrics. Contrast inference count and execution count under actual dynamic batching; request concurrency alone does not prove batching. Never expose arbitrary model names, repository paths, metrics URLs or request scripts.
+Predict the output and shape for `examples/valid-request.json`, then predict why `invalid-request.json` fails. Version 1 is the only configured version; a fixed probe verifies that version 2 is unavailable. The adapter always uses `lab_double` and its explicit version policy. It accepts no arbitrary model name, repository path, URL or script.
 
-The prepared controls always use eight input items, each containing four FP32 values. A client batch size of 4 produces two HTTP requests. Observed inference and execution counts are separate from request count; their ratio can describe server batching only after real measurements pass validation. Fixture tests do not establish batching.
+Each experiment contains eight input items with four FP32 values each. Client batch size 4 produces two HTTP requests. Inference count measures input items; execution count measures backend executions. A request batch can contain several items, and the server may combine requests. Concurrency alone does not prove server batching: compare actual counter deltas and keep client batch size fixed when testing that question.
 
-Render the prepared workload without creating resources:
+Render the workload without creating resources:
 
 ```sh
 kubectl kustomize lessons/04-triton-cpu-serving
 ```
 
-The render generates a ConfigMap directly from this lesson's model repository. It defines one non-root Triton pod, read-only file mounts for the model configuration and Python backend file, bounded temporary/shared-memory volumes, and an HTTP-only ClusterIP Service. Mounting only those two files keeps ConfigMap projection metadata outside Triton's `/models` repository scan. The mounts use `subPath`, so updating the ConfigMap does not update files in a running pod; replace the pod to pick up model changes. Only the operator may reach port 8000; metrics and gRPC have no Service. The image remains an intentionally unusable placeholder pending runtime acceptance. Do not apply this render as a working lesson or replace the placeholder with an unverified tag.
+The ConfigMap comes directly from this lesson's model repository. Two read-only subPath file mounts keep ConfigMap projection metadata outside Triton's model scan. Replace the pod after changing model files. The workload runs one non-root container with a read-only root, bounded temporary/shared-memory volumes and an HTTP-only ClusterIP Service. Only the operator may reach port 8000; metrics and gRPC have no Service.
 
-The session infrastructure accepts an explicit `lab:diskSizeGb` of 30 or 80, with 30 as the default. The larger option is for a separately reviewed Triton-only session, with the same immutable expiry and node bounds. Review actual disk headroom and runtime behavior before selecting an image. See the [session runbook](../../docs/runbook.md#start-a-disposable-session).
+Use the separately reviewed80 GB session disk plan for this pinned image; the original CPU lessons retain their30 GB default. Review the [session runbook](../../docs/runbook.md#start-a-disposable-session), retain immutable expiry, and run lessons sequentially. Deploying this model does not itself configure the operator's image, fixed API egress targets or session deadline.
 
-Acceptance: pinned CPU-compatible image/model inputs; measured extracted image+model+system disk headroom; non-root/writable-temp/shared-memory checks; real readiness and correct FP32 output; wrong-shape error; version behavior; observed batching/metrics; expiry cleanup. The October 23 candidate pull was aborted at the disk-reserve gate before Ready, and its disposable session was removed. No Triton backend execution or live adapter has been validated yet.
-
-The revised file mounts have passed render checks only. Live pod startup and inference with this mount layout remain untested.
+Acceptance includes the real fixed-adapter experiment, valid/error/version behavior, counter deltas, current pod identity, browser controls and verified expiry cleanup. A Ready pod or a fixture test alone does not complete the lesson.

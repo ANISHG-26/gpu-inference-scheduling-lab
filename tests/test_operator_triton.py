@@ -74,18 +74,23 @@ class TritonAdmissionHTTPTests(unittest.TestCase):
         return status, value
 
     def test_prepared_runtime_gate_blocks_http_dispatch_even_with_ready_pod(self):
-        with patch.object(operator.triton, 'run_experiment') as execute:
+        closed_catalog = tuple(
+            {**item, 'gate': 'runtime gate not yet passed'} if item['id'] == LESSON else item
+            for item in operator._catalog()
+        )
+        with patch.object(operator, '_catalog', return_value=closed_catalog), \
+                patch.object(operator.triton, 'run_experiment') as execute:
             status, value = self.post({'lesson_id': LESSON, 'concurrency': 4, 'batch_size': 4})
         self.assertEqual(status, 503)
         self.assertEqual(value['error'], 'lesson_unavailable')
         execute.assert_not_called()
 
     def test_fixture_open_gate_uses_fixed_adapter_and_input_units(self):
-        catalog = tuple({**item, 'gate': None} if item['id'] == LESSON else item for item in operator._catalog())
+        self.assertTrue(operator._lesson_gate_open(LESSON))
         result = {'summary': {'completed': 8, 'errors': 0, 'requests_completed': 2, 'request_errors': 0,
                   'p50_ms': 2.0, 'p95_ms': 3.0, 'wall_seconds': .02, 'inferences_per_second': 400},
                   'triton': {'counter_deltas': {'success': 2, 'inference_count': 8, 'execution_count': 2}}, 'error': None}
-        with patch.object(operator, '_catalog', return_value=catalog), patch.object(operator.triton, 'run_experiment', return_value=result) as execute:
+        with patch.object(operator.triton, 'run_experiment', return_value=result) as execute:
             status, _ = self.post({'lesson_id': LESSON, 'concurrency': 4, 'batch_size': 4})
             self.assertEqual(status, 202)
             deadline = time.monotonic() + 2
@@ -101,14 +106,13 @@ class TritonAdmissionHTTPTests(unittest.TestCase):
         self.assertEqual(state['triton']['mean_batch_size'], 4)
 
     def test_sequential_admissions_get_distinct_ids_with_same_clock_and_thread(self):
-        catalog = tuple({**item, 'gate': None} if item['id'] == LESSON else item for item in operator._catalog())
+        self.assertTrue(operator._lesson_gate_open(LESSON))
         result = {'summary': {'completed': 4, 'errors': 0, 'requests_completed': 1, 'request_errors': 0,
                   'p50_ms': 2.0, 'p95_ms': 3.0, 'wall_seconds': .02, 'inferences_per_second': 200},
                   'triton': {'counter_deltas': {'success': 1, 'inference_count': 4, 'execution_count': 1}}, 'error': None}
         fixed_now = int(time.time())
         ids = []
-        with patch.object(operator, '_catalog', return_value=catalog), \
-                patch.object(operator.triton, 'run_experiment', return_value=result), \
+        with patch.object(operator.triton, 'run_experiment', return_value=result), \
                 patch.object(operator.time, 'time', return_value=fixed_now):
             for _ in range(2):
                 client, server_socket = socket.socketpair()

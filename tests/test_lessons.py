@@ -18,11 +18,11 @@ class LessonCatalogTests(unittest.TestCase):
                 self.assertTrue((root / "lessons" / item["id"] / "README.md").is_file())
                 self.assertNotIn("state", item)  # Preparation is not live observation.
 
-    def test_unresolved_stacks_have_explicit_gates(self):
+    def test_slurm_remains_gated_and_triton_cpu_lesson_is_enabled(self):
         self.assertIsNone(CATALOG[0]["gate"])
         self.assertIsNone(CATALOG[1]["gate"])
         self.assertIn("privilege", CATALOG[2]["gate"])
-        self.assertIn("disk", CATALOG[3]["gate"])
+        self.assertIsNone(CATALOG[3]["gate"])
 
 
 if __name__ == "__main__":

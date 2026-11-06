@@ -169,6 +169,10 @@
         if (Number.isFinite(counters.inference_count)) grid.append(metric("Inference count delta", String(counters.inference_count)));
         if (Number.isFinite(counters.execution_count)) grid.append(metric("Execution count delta", String(counters.execution_count)));
         if (Number.isFinite(exp.triton?.mean_batch_size)) grid.append(metric("Observed items / execution", formatMetric(exp.triton.mean_batch_size, "")));
+        const model = exp.triton?.model;
+        if (model) grid.append(metric("Fixed model", `${model.name} · version ${model.version}`));
+        grid.append(metric("Invalid shape HTTP", String(exp.triton?.negative_probes?.invalid_shape_status ?? "—")),
+          metric("Missing version HTTP", String(exp.triton?.negative_probes?.missing_version_status ?? "—")));
       } else {
         grid.append(metric("Completed", String(summary.completed ?? "—")), metric("Errors", String(summary.errors ?? "—")),
           metric("p50 latency", formatMetric(summary.p50_latency_seconds, " s")), metric("p95 latency", formatMetric(summary.p95_latency_seconds, " s")),
