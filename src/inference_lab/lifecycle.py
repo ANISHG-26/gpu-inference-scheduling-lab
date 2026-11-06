@@ -17,6 +17,8 @@ from urllib.parse import urlsplit
 
 MIN_TTL_MINUTES = 30
 MAX_TTL_MINUTES = 240
+MIN_ABSOLUTE_SECONDS = MIN_TTL_MINUTES * 60
+MAX_ABSOLUTE_SECONDS = 8 * 60 * 60
 MAX_PULUMI_SECONDS = 20 * 60
 RUN_ID_RE = re.compile(r"^[0-9a-f]{12}$")
 LABELS = {"managed-by": "inference-lab"}
@@ -34,6 +36,7 @@ class LabConfig:
     session_stack: str
     ttl_minutes: int
     node_count: int
+    expires_at: int | None = None
 
     @classmethod
     def load(cls, path: Path) -> "LabConfig":
@@ -67,7 +70,10 @@ class LabConfig:
             raise LabError(f"ttl_minutes must be between {MIN_TTL_MINUTES} and {MAX_TTL_MINUTES}")
         if type(count) is not int or count not in (1, 2):
             raise LabError("node_count must be 1 or 2")
-        return cls(*(raw[key].strip() for key in required[:4]), ttl, count)
+        expires_at = raw.get("expires_at")
+        if "expires_at" in raw and (type(expires_at) is not int or expires_at <= 0):
+            raise LabError("expires_at must be a positive integer Unix timestamp")
+        return cls(*(raw[key].strip() for key in required[:4]), ttl, count, expires_at)
 
 
 class Pulumi:
@@ -351,6 +357,7 @@ class LabController:
 
     def plan(self) -> dict[str, Any]:
         now = int(self.clock())
+        expires_at = self._expiry_for(now)
         return {
             "project_id": self.config.project_id,
             "zone": self.config.zone,
@@ -358,13 +365,24 @@ class LabController:
             "session_stack": self.config.session_stack,
             "ttl_minutes": self.config.ttl_minutes,
             "node_count": self.config.node_count,
-            "expires_at": now + self.config.ttl_minutes * 60,
+            "expires_at": expires_at,
+            "expiry_mode": "absolute" if self.config.expires_at is not None else "ttl",
+            "absolute_expiry_bounds_seconds": [MIN_ABSOLUTE_SECONDS, MAX_ABSOLUTE_SECONDS],
             "cluster_name_prefix": "inference-lab-",
             "ttl_bounds_minutes": [MIN_TTL_MINUTES, MAX_TTL_MINUTES],
             "node_count_bounds": [1, 2],
         }
 
+    def _expiry_for(self, now: int) -> int:
+        if self.config.expires_at is None:
+            return now + self.config.ttl_minutes * 60
+        remaining = self.config.expires_at - now
+        if not MIN_ABSOLUTE_SECONDS <= remaining <= MAX_ABSOLUTE_SECONDS:
+            raise LabError("expires_at must be between 30 minutes and 8 hours from now")
+        return self.config.expires_at
+
     def start(self) -> dict[str, Any]:
+        expires_at = self._expiry_for(int(self.clock()))
         self.private_dir.mkdir(parents=True, exist_ok=True)
         try:
             lock_fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -387,7 +405,6 @@ class LabController:
             run_id = self.run_id_factory()
             if not RUN_ID_RE.fullmatch(run_id):
                 raise LabError("Run ID generator returned an invalid identifier")
-            expires_at = int(self.clock()) + self.config.ttl_minutes * 60
             cluster_name = f"inference-lab-{run_id}"
             record = {
                 "version": 1, "project_id": self.config.project_id, "zone": self.config.zone,
@@ -409,6 +426,7 @@ class LabController:
             for key, value in {
                 "lab:projectId": self.config.project_id, "lab:zone": self.config.zone,
                 "lab:runId": run_id, "lab:expiresAt": str(expires_at),
+                "lab:absoluteDeadline": str(self.config.expires_at is not None).lower(),
                 "lab:nodeCount": str(self.config.node_count),
                 "lab:foundationStack": self.config.foundation_stack,
             }.items():

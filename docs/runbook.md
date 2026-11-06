@@ -39,6 +39,8 @@ Verify the expiry service's identity, queue retries, IAM and outputs before the 
 
 ## Start a disposable session
 
+For a reviewed fixed end time, private `.lab/config.json` may include `expires_at` as a positive Unix timestamp. At start it must be 30 minutes to eight hours ahead; the ordinary `ttl_minutes` setting still accepts only 30–240 minutes. The controller registers that exact deadline before provisioning and does not extend an existing session. `plan` reports the expiry mode and timestamp. Leave `expires_at` absent for the usual relative TTL, and remove it after the fixed-deadline session has been cleaned up.
+
 Session boot disks default to 30 GB. An explicitly reviewed Triton-only plan may set `lab:diskSizeGb` to 80 in the empty session stack before preview/start; only 30 and 80 are accepted. Pulumi retains explicit settings across sessions, so set it back to 30 for the original CPU lesson plan. This setting does not start resources or extend expiry, and the local `plan` command does not display it. Confirm the disk value in the provider-backed preview, quota calculation and live node pool.
 
 Initialize an **empty** session stack from `infra/session`, with the same private backend. Keep the foundation and session stack names distinct and fully qualified. Return to the repository root. Install the package with `.[cloud,checks,serve]`. Copy `config/lab.example.json` to ignored `.lab/config.json`, replace placeholders, and leave the initial node count at one. Default TTL is 120 minutes; allowed range is 30–240, starting before provisioning.
