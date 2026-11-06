@@ -1,55 +1,67 @@
 # GPU Inference Scheduling Lab
 
-A hands-on platform for understanding how inference systems behave under load and failure. Run a real language model, observe where its pods and request handlers execute, and compare latency, throughput and recovery through bounded experiments.
+A hands-on lab for seeing how inference systems place and serve work. Pick a lesson, write a prediction, run a small fixed experiment, then compare the result with live pod observations and service metrics.
 
-The lab starts with **CPU inference on Kubernetes**. Pulumi Python provisions disposable GKE sessions; Ray Serve routes requests to vLLM model servers. A cluster-hosted operator console brings lesson instructions, live placement, readiness, measurements and session lifetime into one localhost-forwarded page. GPU execution is future work.
+## Two-minute refresher
 
-## What this project demonstrates
+The first two lessons run a real Qwen3-0.6B model with Ray Serve and vLLM on CPU Kubernetes. They explore placement, request routing, throughput and recovery. Lesson 04 follows a separate path: NVIDIA Triton serves a tiny deterministic CPU model that doubles FP32 values. It teaches model versions, tensor shapes, request batching and server metrics; it is not an LLM or GPU benchmark.
 
-- **Scheduling at different layers:** Kubernetes places pods, Ray places request-handling replicas, and vLLM schedules model tokens.
-- **Measured experiments:** fixed prompts and bounded request batches make one-node and two-node behavior comparable.
-- **Failure recovery:** pod UIDs and readiness distinguish a replacement from a surviving replica; real generation verifies recovery.
-- **Disposable infrastructure:** expiry is registered before provisioning and runs independently of the local client.
-- **Constrained operations:** private Services, a read-only pod observer and fixed experiment adapters keep provisioning and arbitrary commands out of the browser.
+In the console, select the server-designated active lesson, read its steps, and record a prediction. For Triton, choose a client batch size and concurrency, run eight input items, and compare completed inputs, HTTP requests and Triton counter deltas. The prediction is kept in the current browser only. Lesson selection does not deploy infrastructure.
 
-## Lessons and current status
+The Triton CPU runtime, console API and browser experiment were validated on **2026-11-06**. The walkthrough's disposable session was then shut down, and cluster, VM and boot-disk absence were verified. Historical measurements describe that run; they do not guarantee a live deployment. Slurm remains gated, and GPU execution is future work.
 
-| Lesson | Focus | Status |
-| --- | --- | --- |
-| [01 · Single-node inference](lessons/01-single-node-inference/README.md) | Establish a baseline and compare concurrency settings | Real inference, load and recovery validated |
-| [02 · Two-node inference](lessons/02-two-node-inference/README.md) | Independent model copies, placement and survivor behavior | Placement, load and recovery validated through the console API |
-| [03 · Slurm CPU scheduling](lessons/03-slurm-cpu-scheduling/README.md) | Queues, allocations, job limits and cancellation | Materials prepared; deployment compatibility gates remain |
-| [04 · Triton CPU serving](lessons/04-triton-cpu-serving/README.md) | Model repositories, versions, batching and metrics | CPU runtime, console API and browser experiment validated |
+Start here:
 
-The first two lessons use real **Qwen3-0.6B** inference. Local checks, container checks and live experiments are recorded separately; healthy pods alone do not establish inference success. The [initial baseline report](docs/results/2026-10-22-cpu-baseline.md) includes measured load, recovery and automatic-expiry evidence. The [compatibility assessment](docs/lesson-compatibility.md) explains the remaining Slurm and Triton decisions.
+- [Quick guide](QUICK_GUIDE.md) — screen-by-screen console walkthrough and how to interpret the Triton run.
+- [Triton lesson](lessons/04-triton-cpu-serving/README.md) — model, request examples and runtime constraints.
+- [Operator guide](operator/README.md) — console API and localhost access.
+- [Session runbook](docs/runbook.md) — reviewed activation and shutdown procedure.
+- [Compatibility notes](docs/lesson-compatibility.md) — dated runtime and deployment evidence.
 
-## Architecture
+[![Triton batching walkthrough: eight inputs, two request counts](videos/triton-batching.jpg)](videos/triton-batching.webm)
 
-The diagram shows the LLM baseline request path and session lifecycle. The console adds read-only Kubernetes pod observations. The Triton lesson runs separately through its own private Service.
+**Watch the 78-second walkthrough:** [video file](videos/triton-batching.webm) · [local player](WATCH.html). Captions explain the real experiment without audio. GitHub may show the player's HTML source; open `WATCH.html` from a downloaded checkout to use the player.
+
+## How the pieces fit
+
+The Triton experiment path is deliberately short: the browser talks to a loopback-forwarded operator, which checks session and lesson state before sending bounded requests to a private Triton Service. The operator reads pod placement from Kubernetes; that observation is separate from the Triton request path. Expiry is registered and handled by the lifecycle service, independently of the browser.
 
 ```mermaid
 flowchart LR
-  Operator[Operator: start / stop] --> Lifecycle[Python lifecycle controller]
-  Lifecycle --> Task[Register authenticated expiry task first]
-  Task --> Expiry[Cloud Run expiry worker]
-  Lifecycle --> Pulumi[Pulumi session: fixed CPU GKE]
-  Expiry --> Delete[Verify labels / delete exact session / verify absence]
-  Client[Bounded load tool] --> Access[kubectl port-forward]
-  subgraph GKE[One or two CPU nodes]
-    Access --> Ray[Ray Serve request replicas]
-    Ray --> Service[Private Kubernetes Service]
-    Service --> ModelA[vLLM: complete model copy A]
-    Service --> ModelB[Optional copy B on another node]
-  end
+  Browser[Browser console] -->|same-origin API| Local[Loopback port-forward]
+  Local --> Operator[Cluster operator]
+  Operator -->|fixed bounded requests| Triton[Private Triton Service]
+  Operator -.->|read-only pod observation| KubeAPI[Kubernetes API]
+  Lifecycle[Session lifecycle] -->|register deadline before provisioning| Expiry[Independent expiry worker]
+  Expiry -->|delete owned session and verify absence| Cluster[Disposable cluster]
 ```
 
-Each vLLM pod holds a complete model copy. The Kubernetes Service distributes connections to Ready model pods; this is replica-based serving, not model partitioning. A Ray node header identifies the request handler, not the model pod that generated the response.
+The page enables actions only for the active lesson, a live session, fresh operator state and a Ready model pod. It cannot start, extend or stop a session. Its countdown reflects the last API snapshot; it does not prove that cluster resources have been deleted.
 
-The console follows a simple learning loop: **predict → run a bounded experiment → inspect the evidence → explain the result**. Selecting a lesson does not provision its infrastructure. Start with the [lesson guide](lessons/README.md), [operator console guide](operator/README.md), or [architecture overview](docs/architecture.md).
+<a id="lessons-and-current-status"></a>
 
-## Run the local checks
+## Lessons and evidence
 
-Use Python 3.12 and kubectl. These checks do not require cloud credentials.
+| Lesson | What it teaches | Evidence status |
+| --- | --- | --- |
+| [01 · Single-node inference](lessons/01-single-node-inference/README.md) | Baseline inference, concurrency and recovery | Real inference, load and recovery validated |
+| [02 · Two-node inference](lessons/02-two-node-inference/README.md) | Independent model copies, placement and survivor behavior | Placement, load and recovery validated through the console API; fresh browser walkthrough remains |
+| [03 · Slurm CPU scheduling](lessons/03-slurm-cpu-scheduling/README.md) | Queues, allocations, limits and cancellation | Gated; offline evidence checker only, no live lesson |
+| [04 · Triton CPU serving](lessons/04-triton-cpu-serving/README.md) | Model repository, versions, batching and metrics | CPU runtime, console API, browser experiment and session cleanup validated |
+
+Lesson 04 uses eight fixed input items. Batch size 1 makes eight HTTP requests; batch size 4 makes two. Triton inference and execution counters help show whether executions combined items, but counter differences alone do not prove that client batching caused the difference or establish a performance recommendation. Small CPU measurements are noisy; compare runs with other settings held fixed.
+
+The first two lessons use real Qwen3-0.6B inference. See the [baseline report](docs/results/2026-10-22-cpu-baseline.md) for historical load, recovery and expiry evidence. A Ready pod by itself does not establish a successful inference experiment. The first two lessons use 30 GB standard disks; the Triton CPU plan uses a separately reviewed 80 GB standard disk. No GPU is configured.
+
+## Architecture and operations
+
+The original Ray/vLLM path separates three scheduling layers: Kubernetes places pods, Ray Serve routes requests to request-handling replicas, and vLLM schedules model tokens. Each vLLM pod holds a full model copy. Lesson 04 uses Triton instead of Ray and vLLM.
+
+For deeper detail, read the [architecture overview](docs/architecture.md), [experiment notes](docs/experiments.md), and [deployment and shutdown runbook](docs/runbook.md). Run only one lesson per disposable session. Expiry is registered before provisioning and runs independently of the local console; retain the runbook's ownership and cleanup checks.
+
+## Local checks
+
+Use Python 3.12 and kubectl. These checks need no cloud credentials:
 
 ```sh
 python -m venv .venv
@@ -62,23 +74,4 @@ python checks/runtime_contract.py
 python checks/adapter_contract.py -v
 ```
 
-On Linux, `python checks/ray_smoke.py` also starts a local Ray cluster against an HTTP fixture. It checks serving integration; it does not run a language model. Dockerfiles and a credentials-free pull-request workflow are included.
-
-## Deploy a disposable session
-
-Follow the [deployment and shutdown runbook](docs/runbook.md). Review project configuration, quotas, runtime image digests and cost before provisioning. The validated CPU shape uses one or two `n2-standard-4` nodes with 30 GB standard boot disks, without GPUs or autoscaling. Run lessons sequentially.
-
-The session deadline starts before provisioning. Automatic expiry deletes the disposable cluster; reusable foundation resources such as the registry and expiry service remain and can incur charges. The browser has no cloud start, extend or stop controls.
-
-## Repository guide
-
-| Path | Purpose |
-| --- | --- |
-| [`lessons/`](lessons/README.md) | Sequential lesson instructions and experiment inputs |
-| [`src/inference_lab/`](src/inference_lab) | Lifecycle, serving, benchmark and console backend code |
-| [`operator/`](operator/README.md) | Console frontend and operating guide |
-| [`infra/`](infra) | Separate Pulumi foundation and session stacks |
-| [`k8s/`](k8s) | Baseline, two-node and optional console manifests |
-| [`tests/`](tests) and [`checks/`](checks) | Behavior tests and infrastructure/runtime contracts |
-
-Further reading: [experiment worksheet](docs/experiments.md) and [runtime compatibility and license notes](docs/lesson-compatibility.md).
+On Linux, `python checks/ray_smoke.py` checks the Ray serving integration against an HTTP fixture; it does not run a language model. Local checks, hosted CI and live model experiments are separate evidence.
