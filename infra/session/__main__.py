@@ -8,8 +8,13 @@ cfg = pulumi.Config("lab")
 project, zone, run_id = cfg.require("projectId"), cfg.require("zone"), cfg.require("runId")
 expires = cfg.require_int("expiresAt")
 nodes = cfg.require_int("nodeCount")
+disk_size_gb = cfg.get_int("diskSizeGb")
+if disk_size_gb is None:
+    disk_size_gb = 30
 if not re.fullmatch(r"[0-9a-f]{12}", run_id) or nodes not in (1, 2):
     raise ValueError("Session must have a unique run ID and one or two fixed nodes")
+if disk_size_gb not in (30, 80):
+    raise ValueError("Session disk size must be 30 or 80 GB")
 if expires <= int(time.time()) or expires > int(time.time()) + 240 * 60:
     raise ValueError("Session expiry must be in the next four hours")
 foundation = pulumi.StackReference(cfg.require("foundationStack"))
@@ -36,7 +41,7 @@ cluster = gcp.container.Cluster("session", name=cluster_name, project=project, l
     node_pools=[{"name": "cpu", "node_count": nodes,
       "upgrade_settings": {"max_surge": 0, "max_unavailable": 1},
       "node_config": {"machine_type": "n2-standard-4", "min_cpu_platform": "Intel Cascade Lake",
-        "disk_size_gb": 30, "disk_type": "pd-standard", "image_type": "COS_CONTAINERD",
+        "disk_size_gb": disk_size_gb, "disk_type": "pd-standard", "image_type": "COS_CONTAINERD",
         "service_account": foundation.require_output("nodeServiceAccount"),
         "oauth_scopes": ["https://www.googleapis.com/auth/cloud-platform"],
         "metadata": {"disable-legacy-endpoints": "true"},
@@ -45,5 +50,6 @@ cluster = gcp.container.Cluster("session", name=cluster_name, project=project, l
     monitoring_config={"enable_components": ["SYSTEM_COMPONENTS"]},
     opts=pulumi.ResourceOptions(provider=provider, depends_on=[foundation]))
 for key, value in {"projectId": project, "zone": zone, "clusterName": cluster_name,
-                   "runId": run_id, "expiresAt": expires, "nodeCount": nodes}.items():
+                   "runId": run_id, "expiresAt": expires, "nodeCount": nodes,
+                   "diskSizeGb": disk_size_gb}.items():
     pulumi.export(key, value)

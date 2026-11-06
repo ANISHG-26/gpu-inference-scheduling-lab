@@ -25,6 +25,10 @@ spec:
             matchExpressions:
               - {key: ray.io/node-type, operator: In, values: [head, worker]}
       ports: [{protocol: TCP, port: 8000}]
+    - to:
+        - podSelector:
+            matchLabels: {app: triton}
+      ports: [{protocol: TCP, port: 8000}]
     # Fail closed. The activation overlay must replace this documentation-only
     # address with the exact Kubernetes API endpoint /32 (and verify datapath
     # service translation). Never enable a broad Internet egress workaround.

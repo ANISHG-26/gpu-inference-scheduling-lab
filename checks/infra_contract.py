@@ -25,10 +25,11 @@ class FakeCloud(Mocks):
         return args.args
 
 pulumi.runtime.set_mocks(FakeCloud(), project="inference-lab-session", stack="test", preview=False)
-pulumi.runtime.set_all_config({"lab:projectId": "sample-project", "lab:zone": "us-central1-a",
+BASE_CONFIG = {"lab:projectId": "sample-project", "lab:zone": "us-central1-a",
     "lab:runId": "abcdef123456", "lab:expiresAt": str(EXPIRY), "lab:nodeCount": "2",
     "lab:foundationStack": "org/inference-lab-foundation/test", "lab:enableExpiry": "true",
-    "lab:expiryImage": "us-central1-docker.pkg.dev/sample-project/inference-lab/expiry@sha256:" + "a" * 64})
+    "lab:expiryImage": "us-central1-docker.pkg.dev/sample-project/inference-lab/expiry@sha256:" + "a" * 64}
+pulumi.runtime.set_all_config(BASE_CONFIG)
 
 class Infrastructure(unittest.TestCase):
     @pulumi.runtime.test
@@ -45,6 +46,8 @@ class Infrastructure(unittest.TestCase):
             self.assertEqual(pool["upgradeSettings"]["maxSurge"], 0)
             self.assertNotIn("autoscaling", pool)
             self.assertEqual(pool["nodeConfig"]["machineType"], "n2-standard-4")
+            self.assertEqual(pool["nodeConfig"]["diskSizeGb"], 30)
+            self.assertEqual(session["disk_size_gb"], 30)
             self.assertNotIn("guestAccelerators", pool["nodeConfig"])
             self.assertFalse(cluster["controlPlaneEndpointsConfig"]["ipEndpointsConfig"]["enabled"])
             self.assertEqual(cluster["resourceLabels"]["lab-run"], "abcdef123456")
@@ -63,6 +66,29 @@ class Infrastructure(unittest.TestCase):
             self.assertFalse(any(v.get("role") in ("roles/editor", "roles/owner") for v in build_grants))
         return pulumi.Output.all(session["cluster"].urn, foundation["queue"].urn,
                                  foundation["service"].urn).apply(verify)
+
+    @pulumi.runtime.test
+    def test_optional_disk_size_is_bounded_and_exported(self):
+        RESOURCES.clear()
+        pulumi.runtime.set_all_config({**BASE_CONFIG, "lab:diskSizeGb": "80"})
+        session = runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+        try:
+            pulumi.runtime.set_all_config({**BASE_CONFIG, "lab:diskSizeGb": "60"})
+            with self.assertRaises(ValueError):
+                runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+
+            pulumi.runtime.set_all_config({**BASE_CONFIG, "lab:diskSizeGb": "80.0"})
+            with self.assertRaises(pulumi.ConfigTypeError):
+                runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+        finally:
+            pulumi.runtime.set_all_config(BASE_CONFIG)
+
+        def verify(_):
+            cluster = next(r.inputs for r in RESOURCES if r.typ == "gcp:container/cluster:Cluster")
+            self.assertEqual(session["disk_size_gb"], 80)
+            self.assertEqual(cluster["nodePools"][0]["nodeConfig"]["diskSizeGb"], 80)
+
+        return session["cluster"].urn.apply(verify)
 
 if __name__ == "__main__":
     unittest.main()

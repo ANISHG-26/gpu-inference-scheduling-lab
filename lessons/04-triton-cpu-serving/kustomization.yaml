@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: inference-lab
+resources:
+  - k8s/namespace.yaml
+  - k8s/triton.yaml
+configMapGenerator:
+  - name: triton-model
+    files:
+      - model-repository/lab_double/config.pbtxt
+      - model-repository/lab_double/1/model.py
+    options:
+      disableNameSuffixHash: true
