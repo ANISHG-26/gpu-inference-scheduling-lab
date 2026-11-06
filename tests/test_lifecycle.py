@@ -23,6 +23,7 @@ class FakePulumi:
         self.events = events
         self.session_outputs = session_outputs
         self.timeout = 20 * 60
+        self.config = {}
 
     def existing_outputs(self, stack: str) -> dict[str, Any] | None:
         self.events.append("inspect-session")
@@ -33,13 +34,14 @@ class FakePulumi:
         return FOUNDATION if stack == "foundation" else (self.session_outputs or {})
 
     def config_set(self, stack: str, key: str, value: str) -> None:
+        self.config[key] = value
         self.events.append(f"config:{key}")
 
     def up(self, stack: str) -> None:
         self.events.append("up")
         self.session_outputs = {"projectId": "private-project", "zone": "northamerica-northeast1-a",
                                 "clusterName": "inference-lab-012345abcdef", "runId": "012345abcdef",
-                                "expiresAt": 1_900_000_000}
+                                "expiresAt": int(self.config["lab:expiresAt"])}
 
     def destroy(self, stack: str) -> None:
         self.events.append(f"destroy:{stack}")
@@ -95,6 +97,18 @@ class LabConfigTests(unittest.TestCase):
                                         "ttl_minutes": 30, "node_count": 1}), encoding="utf-8")
             with self.assertRaisesRegex(LabError, "project_id"):
                 LabConfig.load(path)
+
+    def test_optional_absolute_expiry_requires_positive_integer(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "config.json"
+            base = {"project_id": "p", "zone": "z", "foundation_stack": "f", "session_stack": "s",
+                    "ttl_minutes": 30, "node_count": 1}
+            for value in (None, True, False, 0, -1, 1.5, "1900000000"):
+                path.write_text(json.dumps({**base, "expires_at": value}), encoding="utf-8")
+                with self.subTest(value=value), self.assertRaisesRegex(LabError, "expires_at"):
+                    LabConfig.load(path)
+            path.write_text(json.dumps(base), encoding="utf-8")
+            self.assertIsNone(LabConfig.load(path).expires_at)
 
     def test_pulumi_argv_is_a_list_and_timeout_is_bounded(self) -> None:
         seen: list[Any] = []
@@ -160,6 +174,42 @@ class LifecycleTests(unittest.TestCase):
         plan = controller.plan()
         self.assertEqual(plan["node_count"], 1)
         self.assertEqual(plan["ttl_minutes"], 30)
+
+    def test_explicit_expiry_is_fixed_across_record_task_and_pulumi(self) -> None:
+        deadline = 1_900_019_800  # six hours after this controller's fixed clock
+        config_path = self.root / ".lab" / "config.json"
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config["expires_at"] = deadline
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        self.controller = LabController(self.root, pulumi=self.pulumi, task_client=self.tasks,
+                                        clock=lambda: 1_899_998_200,
+                                        run_id_factory=lambda: "012345abcdef")
+        plan = self.controller.plan()
+        self.assertEqual(plan["expires_at"], deadline)
+        self.assertEqual(plan["expiry_mode"], "absolute")
+        result = self.controller.start()
+        record = json.loads((self.root / ".lab" / "sessions" / "012345abcdef.json").read_text(encoding="utf-8"))
+        self.assertEqual(record["expires_at"], deadline)
+        self.assertEqual(self.tasks.assertions[2]["expires_at"], deadline)
+        self.assertEqual(self.tasks.assertions[3], deadline)
+        self.assertEqual(self.pulumi.config["lab:expiresAt"], str(deadline))
+        self.assertEqual(self.pulumi.config["lab:absoluteDeadline"], "true")
+        self.assertEqual(result["expires_at"], deadline)
+
+    def test_expired_and_overlong_absolute_deadlines_stop_before_task_or_up(self) -> None:
+        for deadline in (1_899_998_199, 1_900_027_001):
+            config_path = self.root / ".lab" / "config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["expires_at"] = deadline
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            controller = LabController(self.root, pulumi=self.pulumi, task_client=self.tasks,
+                                       clock=lambda: 1_899_998_200,
+                                       run_id_factory=lambda: "012345abcdef")
+            with self.subTest(deadline=deadline), self.assertRaises(LabError):
+                controller.start()
+            self.assertNotIn("task", self.events)
+            self.assertNotIn("up", self.events)
+            self.events.clear()
 
     def test_pulumi_default_working_directories_are_split_by_stack(self) -> None:
         from inference_lab.lifecycle import Pulumi

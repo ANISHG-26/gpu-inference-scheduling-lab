@@ -33,6 +33,33 @@ pulumi.runtime.set_all_config(BASE_CONFIG)
 
 class Infrastructure(unittest.TestCase):
     @pulumi.runtime.test
+    def test_expiry_window_requires_explicit_absolute_deadline_mode(self):
+        try:
+            six_hours = int(time.time()) + 6 * 60 * 60
+            config = {**BASE_CONFIG, "lab:expiresAt": str(six_hours)}
+            pulumi.runtime.set_all_config(config)
+            with self.assertRaises(ValueError):
+                runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+
+            ordinary_limit_plus_one = int(time.time()) + 240 * 60 + 1
+            pulumi.runtime.set_all_config({**BASE_CONFIG,
+                                           "lab:expiresAt": str(ordinary_limit_plus_one)})
+            with self.assertRaises(ValueError):
+                runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+
+            pulumi.runtime.set_all_config({**config, "lab:absoluteDeadline": "true"})
+            accepted = runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+
+            too_far = int(time.time()) + 8 * 60 * 60 + 1
+            pulumi.runtime.set_all_config({**config, "lab:absoluteDeadline": "true",
+                                            "lab:expiresAt": str(too_far)})
+            with self.assertRaises(ValueError):
+                runpy.run_path(str(ROOT / "infra/session/__main__.py"))
+        finally:
+            pulumi.runtime.set_all_config(BASE_CONFIG)
+        return accepted["cluster"].urn
+
+    @pulumi.runtime.test
     def test_cpu_session_and_authenticated_expiry(self):
         session = runpy.run_path(str(ROOT / "infra/session/__main__.py"))
         foundation = runpy.run_path(str(ROOT / "infra/foundation/__main__.py"))

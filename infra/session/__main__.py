@@ -15,8 +15,10 @@ if not re.fullmatch(r"[0-9a-f]{12}", run_id) or nodes not in (1, 2):
     raise ValueError("Session must have a unique run ID and one or two fixed nodes")
 if disk_size_gb not in (30, 80):
     raise ValueError("Session disk size must be 30 or 80 GB")
-if expires <= int(time.time()) or expires > int(time.time()) + 240 * 60:
-    raise ValueError("Session expiry must be in the next four hours")
+absolute_deadline = cfg.get_bool("absoluteDeadline", False)
+max_expiry_seconds = 8 * 60 * 60 if absolute_deadline else 240 * 60
+if expires <= int(time.time()) or expires > int(time.time()) + max_expiry_seconds:
+    raise ValueError("Session expiry exceeds the configured expiry window")
 foundation = pulumi.StackReference(cfg.require("foundationStack"))
 def match(values):
     if values != [project, zone]:
