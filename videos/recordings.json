@@ -1,0 +1,49 @@
+{
+  "recordings": [
+    {
+      "title": "Eight inputs, different batch sizes",
+      "captured_at": "2026-11-06T22:20:50.422Z",
+      "environment": "real CPU Triton service in a disposable Kubernetes session",
+      "deployed_operator_source": "006b8a3f29d4e75274d445da95b6fd7d0eb783b7",
+      "operator_image_digest": "sha256:f4a400662c100476b88ccf7bd5113af18088689dfa1db7d8a20d4a62b328e3e7",
+      "triton_image_digest": "sha256:1f08352ff9318894ca24bb36a532ad450b1289f7a6aeb163ae752a446c400fe6",
+      "model": {
+        "name": "lab_double",
+        "version": "1"
+      },
+      "video": "triton-batching.webm",
+      "poster": "triton-batching.jpg",
+      "duration_seconds": 77.68,
+      "bytes": 10537451,
+      "sha256": "967f70af01a5def07646b058fdabfe9ec850e2e34fe21599024eb8968ec0f9c9",
+      "playwright_version": "1.65.0",
+      "outcomes": [
+        {
+          "concurrency": 4,
+          "batch_size": 1,
+          "completed_inputs": 8,
+          "requests_completed": 8,
+          "execution_count": 4,
+          "invalid_shape_status": 400,
+          "missing_version_status": 404
+        },
+        {
+          "concurrency": 4,
+          "batch_size": 4,
+          "completed_inputs": 8,
+          "requests_completed": 2,
+          "execution_count": 2,
+          "invalid_shape_status": 400,
+          "missing_version_status": 404
+        }
+      ],
+      "verification": {
+        "full_playback": true,
+        "decoded_frames_reviewed": true,
+        "stable_model_pod": true
+      },
+      "presentation": "Captions added and raw pod name/UID/node columns hidden before first render; APIs and measured values unchanged.",
+      "scope": "Behavior demonstration only; no GPU or production performance claim. This captured session was shut down and backing compute absence verified on 2026-11-06."
+    }
+  ]
+}

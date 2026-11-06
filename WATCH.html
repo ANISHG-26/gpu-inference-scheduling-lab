@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Triton batching walkthrough · Inference Lab</title>
+<style>
+  body{margin:0;background:#eef4f5;color:#16323e;font:18px/1.6 system-ui,sans-serif}
+  main{max-width:1100px;margin:auto;padding:32px 24px}h1{line-height:1.2}
+  video{width:100%;max-height:80vh;background:#102f3f;border-radius:14px}
+  a{color:#087d7c}p{max-width:80ch}.note{padding:16px 20px;background:white;border-radius:12px}
+</style>
+<main>
+  <p><a href="README.md">Project overview</a> · <a href="QUICK_GUIDE.md">Quick guide</a></p>
+  <h1>Eight inputs, different batch sizes</h1>
+  <p>A real CPU Triton lesson, captured November 6, 2026. Captions explain the prediction, two bounded experiments and the measured counters. No audio is required.</p>
+  <video controls preload="metadata" poster="videos/triton-batching.jpg" aria-label="Captioned live Triton batching walkthrough">
+    <source src="videos/triton-batching.webm" type="video/webm">
+    <a href="videos/triton-batching.webm">Download the walkthrough</a>
+  </video>
+  <p class="note">This recording shows a past disposable session. It does not connect to a running lab or provision resources. Pod/node identifiers are hidden; inference responses and metrics are live results. Slurm remains gated, and these tiny CPU runs do not establish production performance.</p>
+  <p><a href="videos/recordings.json">Capture and source metadata</a> · <a href="tools/guides/README.md">Regenerate the recording</a></p>
+</main>
+</html>

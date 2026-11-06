@@ -16,3 +16,4 @@ artifacts/
 results/local/
 .venv/
 __pycache__/
+tools/guides/node_modules/
