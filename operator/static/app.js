@@ -91,7 +91,7 @@
     els.stepCount.textContent = `${steps.length} steps`;
     for (const step of steps) els.steps.append(node("li", "step-item", step));
     if (steps.length === 0) els.steps.append(node("li", "muted", "No instructions are available in the current state."));
-    const serverGate = lesson?.gate || (["03-slurm-cpu-scheduling", "04-triton-cpu-serving"].includes(selectedId) && lesson?.actions_enabled !== true
+    const serverGate = lesson?.gate || (["03-slurm-cpu-scheduling", "04-triton-cpu-serving"].includes(selectedId) && !lesson
       ? "The server has not enabled this lesson." : "");
     els.gate.hidden = !serverGate;
     els.gate.textContent = serverGate ? `This lesson is gated: ${serverGate}` : "";

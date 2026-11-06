@@ -6,7 +6,7 @@ metadata:
 spec:
   podSelector:
     matchExpressions:
-      - {key: app, operator: NotIn, values: [lab-operator]}
+      - {key: app, operator: NotIn, values: [lab-operator, triton]}
   policyTypes: [Ingress]
   ingress:
     - from:

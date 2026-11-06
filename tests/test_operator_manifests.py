@@ -36,7 +36,7 @@ class OperatorManifestTests(unittest.TestCase):
     def test_no_broad_ingress_policy_selects_console(self):
         base = yaml.safe_load((ROOT / "k8s/base/network.yaml").read_text())
         expressions = base["spec"]["podSelector"]["matchExpressions"]
-        self.assertIn({"key": "app", "operator": "NotIn", "values": ["lab-operator"]}, expressions)
+        self.assertIn({"key": "app", "operator": "NotIn", "values": ["lab-operator", "triton"]}, expressions)
         policy = yaml.safe_load((ROOT / "k8s/operator/network.yaml").read_text())
         self.assertEqual(policy["spec"]["ingress"], [])
         egress = policy["spec"]["egress"]
@@ -49,6 +49,14 @@ class OperatorManifestTests(unittest.TestCase):
         self.assertEqual(peer["namespaceSelector"]["matchLabels"], {"kubernetes.io/metadata.name": "kube-system"})
         self.assertIn({"key": "k8s-app", "operator": "In", "values": ["kube-dns", "node-local-dns"]},
                       peer["podSelector"].get("matchExpressions", []))
+
+    def test_triton_adapter_has_only_fixed_model_http_egress(self):
+        policy = yaml.safe_load((ROOT / "k8s/operator/network.yaml").read_text())
+        rules = [rule for rule in policy["spec"]["egress"]
+                 if any(peer.get("podSelector", {}).get("matchLabels", {}).get("app") == "triton"
+                        for peer in rule.get("to", []))]
+        self.assertEqual(rules, [{"to": [{"podSelector": {"matchLabels": {"app": "triton"}}}],
+                                  "ports": [{"protocol": "TCP", "port": 8000}]}])
 
 
 if __name__ == "__main__":
