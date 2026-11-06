@@ -14,8 +14,10 @@ Render the prepared workload without creating resources:
 kubectl kustomize lessons/04-triton-cpu-serving
 ```
 
-The render generates a ConfigMap directly from this lesson's model repository. It defines one non-root Triton pod, a read-only model mount, bounded temporary/shared-memory volumes, and an HTTP-only ClusterIP Service. Only the operator may reach port 8000; metrics and gRPC have no Service. The image remains an intentionally unusable placeholder pending runtime acceptance. Do not apply this render as a working lesson or replace the placeholder with an unverified tag.
+The render generates a ConfigMap directly from this lesson's model repository. It defines one non-root Triton pod, read-only file mounts for the model configuration and Python backend file, bounded temporary/shared-memory volumes, and an HTTP-only ClusterIP Service. Mounting only those two files keeps ConfigMap projection metadata outside Triton's `/models` repository scan. The mounts use `subPath`, so updating the ConfigMap does not update files in a running pod; replace the pod to pick up model changes. Only the operator may reach port 8000; metrics and gRPC have no Service. The image remains an intentionally unusable placeholder pending runtime acceptance. Do not apply this render as a working lesson or replace the placeholder with an unverified tag.
 
 The session infrastructure accepts an explicit `lab:diskSizeGb` of 30 or 80, with 30 as the default. The larger option is for a separately reviewed Triton-only session, with the same immutable expiry and node bounds. Review actual disk headroom and runtime behavior before selecting an image. See the [session runbook](../../docs/runbook.md#start-a-disposable-session).
 
 Acceptance: pinned CPU-compatible image/model inputs; measured extracted image+model+system disk headroom; non-root/writable-temp/shared-memory checks; real readiness and correct FP32 output; wrong-shape error; version behavior; observed batching/metrics; expiry cleanup. The October 23 candidate pull was aborted at the disk-reserve gate before Ready, and its disposable session was removed. No Triton backend execution or live adapter has been validated yet.
+
+The revised file mounts have passed render checks only. Live pod startup and inference with this mount layout remain untested.

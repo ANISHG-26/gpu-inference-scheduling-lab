@@ -75,7 +75,8 @@ spec:
             httpGet: {path: /v2/health/ready, port: http}
             periodSeconds: 5
           volumeMounts:
-            - {name: model, mountPath: /models, readOnly: true}
+            - {name: model, mountPath: /models/lab_double/config.pbtxt, subPath: lab_double/config.pbtxt, readOnly: true}
+            - {name: model, mountPath: /models/lab_double/1/model.py, subPath: lab_double/1/model.py, readOnly: true}
             - {name: tmp, mountPath: /tmp}
             - {name: shm, mountPath: /dev/shm}
       volumes:
