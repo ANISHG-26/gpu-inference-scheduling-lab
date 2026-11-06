@@ -15,7 +15,7 @@
     gate: $("gate-note"), steps: $("lesson-steps"), stepCount: $("step-count"), prediction: $("prediction"), predictionPrompt: $("prediction-prompt"),
     concurrency: $("concurrency"), batchSize: $("batch-size"), tritonControls: $("triton-controls"),
     runBudget: $("run-budget"), runDescription: $("run-description"), run: $("run-button"), actionStatus: $("action-status"), result: $("experiment-result"),
-    observationTime: $("observation-time"), placement: $("placement-summary"), pods: $("pod-rows"),
+    observationTime: $("observation-time"), placement: $("placement-summary"), pods: $("pod-rows"), placementIdentity: $("placement-identity-note"),
     reflection: $("reflection-text"), lastRefresh: $("last-refresh"),
   };
   const predictions = new Map();
@@ -122,6 +122,9 @@
   }
   function renderObservation() {
     const observation = latest?.observation;
+    els.placementIdentity.textContent = latest?.active_lesson === "04-triton-cpu-serving"
+      ? "This table shows the current Triton pod and node. A measured experiment also checks that the model pod UID stayed the same before and after its requests."
+      : "Ray node identity describes the scheduling layer; it does not identify which model-serving pod handled a request. This table is an API observation, and the balanced request model pod is unknown.";
     els.pods.replaceChildren();
     if (!observation || observation.status !== "ok") {
       els.observationTime.textContent = observation?.observed_at ? `Last attempt ${formatTime(observation.observed_at)}` : "Not yet observed";
@@ -169,6 +172,10 @@
         if (Number.isFinite(counters.inference_count)) grid.append(metric("Inference count delta", String(counters.inference_count)));
         if (Number.isFinite(counters.execution_count)) grid.append(metric("Execution count delta", String(counters.execution_count)));
         if (Number.isFinite(exp.triton?.mean_batch_size)) grid.append(metric("Observed items / execution", formatMetric(exp.triton.mean_batch_size, "")));
+        const model = exp.triton?.model;
+        if (model) grid.append(metric("Fixed model", `${model.name} · version ${model.version}`));
+        grid.append(metric("Invalid shape HTTP", String(exp.triton?.negative_probes?.invalid_shape_status ?? "—")),
+          metric("Missing version HTTP", String(exp.triton?.negative_probes?.missing_version_status ?? "—")));
       } else {
         grid.append(metric("Completed", String(summary.completed ?? "—")), metric("Errors", String(summary.errors ?? "—")),
           metric("p50 latency", formatMetric(summary.p50_latency_seconds, " s")), metric("p95 latency", formatMetric(summary.p95_latency_seconds, " s")),
@@ -291,6 +298,8 @@
     }, 2000);
   }
   els.prediction.addEventListener("input", () => predictions.set(selectedId, els.prediction.value));
+  els.concurrency.addEventListener("change", renderConnection);
+  els.batchSize.addEventListener("change", renderConnection);
   els.run.addEventListener("click", runExperiment);
   refresh();
   window.setInterval(() => { renderSession(); renderConnection(); }, 1000);

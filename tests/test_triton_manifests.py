@@ -51,7 +51,7 @@ class TritonManifestTests(unittest.TestCase):
         })
 
         container, = pod["containers"]
-        self.assertEqual(container["image"], "registry.invalid/nvidia/tritonserver:review-required")
+        self.assertEqual(container["image"], "nvcr.io/nvidia/tritonserver@sha256:1f08352ff9318894ca24bb36a532ad450b1289f7a6aeb163ae752a446c400fe6")
         self.assertEqual(container["command"], ["/opt/tritonserver/bin/tritonserver"])
         self.assertEqual(container["args"], [
             "--model-repository=/models",

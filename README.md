@@ -19,13 +19,13 @@ The lab starts with **CPU inference on Kubernetes**. Pulumi Python provisions di
 | [01 · Single-node inference](lessons/01-single-node-inference/README.md) | Establish a baseline and compare concurrency settings | Real inference, load and recovery validated |
 | [02 · Two-node inference](lessons/02-two-node-inference/README.md) | Independent model copies, placement and survivor behavior | Placement, load and recovery validated through the console API |
 | [03 · Slurm CPU scheduling](lessons/03-slurm-cpu-scheduling/README.md) | Queues, allocations, job limits and cancellation | Materials prepared; deployment compatibility gates remain |
-| [04 · Triton CPU serving](lessons/04-triton-cpu-serving/README.md) | Model repositories, versions, batching and metrics | Isolated workload, adapter and console controls prepared; runtime gates remain |
+| [04 · Triton CPU serving](lessons/04-triton-cpu-serving/README.md) | Model repositories, versions, batching and metrics | CPU runtime, console API and browser experiment validated |
 
-The CPU lessons use real **Qwen3-0.6B** inference. Local checks, container checks and live experiments are recorded separately; healthy pods alone do not establish inference success. The [initial baseline report](docs/results/2026-10-22-cpu-baseline.md) includes measured load, recovery and automatic-expiry evidence. The [compatibility assessment](docs/lesson-compatibility.md) explains the remaining Slurm and Triton decisions.
+The first two lessons use real **Qwen3-0.6B** inference. Local checks, container checks and live experiments are recorded separately; healthy pods alone do not establish inference success. The [initial baseline report](docs/results/2026-10-22-cpu-baseline.md) includes measured load, recovery and automatic-expiry evidence. The [compatibility assessment](docs/lesson-compatibility.md) explains the remaining Slurm and Triton decisions.
 
 ## Architecture
 
-The diagram shows the CLI request path and session lifecycle. The operator console uses the same private Ray-to-model path and adds read-only Kubernetes pod observations.
+The diagram shows the LLM baseline request path and session lifecycle. The console adds read-only Kubernetes pod observations. The Triton lesson runs separately through its own private Service.
 
 ```mermaid
 flowchart LR

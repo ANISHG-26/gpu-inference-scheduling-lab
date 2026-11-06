@@ -49,12 +49,12 @@ CATALOG = (
         "objective": "Serve a tiny deterministic CPU model and inspect versions, batches, and metrics.",
         "prediction": "How should a batched request change execution count versus inference count?",
         "steps": [
-            "Resolve the exact Triton image digest, disk footprint, Python ABI, shared memory, and non-root gates first.",
-            "Inspect a model repository's config and numeric version directories; select a version explicitly.",
+            "Observe the Ready Triton pod, its UID, and its node before running an experiment.",
+            "Inspect the repository's config and numeric version directories; requests explicitly select version 1.",
             "Send the prepared valid and invalid tensor requests, then inspect readiness and sanitized errors.",
             "Compare batching configurations using actual metrics; do not infer GPU or LLM performance.",
         ],
         "reflection": "How do the model name, version, tensor shape, and backend affect a request?",
-        "gate": "Triton CPU image digest/disk footprint and non-root/Python ABI/shared-memory validation remain unresolved. No live adapter is enabled.",
+        "gate": None,
     },
 )

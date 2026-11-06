@@ -1,7 +1,14 @@
 # Lesson stack compatibility gates
 
-Research checkpoint: 2026-10-22. Sources below are upstream primary sources, checked on this date. This note records preparation and compatibility checks for Slurm and Triton; neither stack was installed or measured. The GKE version observed during separate inference validation is recorded below.
+Research checkpoint: 2026-10-22. Sources below are upstream primary sources, checked on this date. The historical sections record the original preparation gates; the November6 update below supersedes the Triton runtime conclusions. The GKE version observed during separate inference validation is recorded below.
 
+## Current runtime decision — November 6, 2026
+
+Triton 26.09/2.73.0 with the pinned linux/amd64 digest in lesson04 passed real CPU readiness, correct FP32 output, wrong-shape 400 and missing-version 404 responses, Python 3.12 ABI linkage, UID 1000 execution and128 MiB shared memory. The reviewed80 GB standard disk plan held the declared20% available or 4 GiB reserve during pull, startup and protocol checks. This validates that specific runtime/model/shape; it is not a final extracted-image-size estimate or a GPU/LLM performance claim.
+
+The corrected read-only file mounts prevent Kubernetes ConfigMap helper directories from being scanned as extra models. The fixed adapter is now admitted by the catalog, subject to per-session readiness, expiry and topology guards. Separate live console validation passed all 16 concurrency/batch-size combinations and a browser experiment, including stable model identity, version/shape probes and matching metrics. This is behavior validation on a tiny CPU model. Raw provider output and detailed measurements remain private. The NGC container's terms still apply; no container redistribution or comprehensive component-license inventory is claimed.
+
+Slurm remains blocked on the documented worker privilege/cgroup, resource and storage decisions. The historical failures below are preserved as the basis for choosing the separate80 GB Triton plan.
 ## Slurm lesson: evaluate Slinky first, deployment blocked
 
 Use SchedMD's Slinky `slurm-operator` and matching Slurm chart as the candidate, ahead of custom packaging. The repository is actively maintained and publishes Helm charts and CRDs. The current stable operator package visible upstream is **1.2.1**, published about two weeks before this checkpoint; current `main` documents the 1.3 series and chart metadata includes 1.3.0-rc1, so do not use `main` or a prerelease as an implicit pin. When implementation resumes, select a mutually compatible operator, CRD, Slurm chart, and Slurm image set from a dated stable release, then pin image digests. Upstream's compatibility table says 1.2.x supports Kubernetes 1.35–1.37 and Slurm 25.11+; confirm the actual retained GKE cluster version against that table before selection.
@@ -16,9 +23,9 @@ Minimum next checks: (1) confirm the target GKE version, COS image, node allocat
 
 License provenance: the [Slinky operator's tagged v1.2.1 README](https://github.com/SlinkyProject/slurm-operator/blob/v1.2.1/README.md#license) identifies Apache-2.0, as does the [1.2.1 Slurm chart metadata](https://github.com/SlinkyProject/slurm-operator/blob/v1.2.1/helm/slurm/Chart.yaml). Slurm itself is separately licensed under GPL version 2 or later, with an OpenSSL linking exception subject to the conditions in individual source files; see the [26.05.3 `slurmd` source notice](https://github.com/SchedMD/slurm/blob/slurm-26-05-3-1/src/slurmd/slurmd/slurmd.c) and [Slurm COPYING](https://github.com/SchedMD/slurm/blob/slurm-26-05-3-1/COPYING). The Apache chart/operator license does not establish the licenses of its packaged Slurm binaries or other image components. Exact runtime image identities and their included license inventory remain unreviewed.
 
-## Triton lesson: CPU path is supported; image and runtime gates remain
+## Triton lesson: original image and runtime assessment (October 22)
 
-The current Triton Inference Server release is **2.73.0 / NGC container 26.09**. NVIDIA's compatibility table identifies the 26.09 release and its backend versions. The `26.09-py3` image is a candidate for Python backend; `26.09-py3-min` is the base in NVIDIA's documented general container composition flow, which currently excludes CPU-only customization. Candidate linux/amd64 manifest digests are resolved below. Final runtime image selection and digest pinning await the disk and runtime checks.
+The assessed Triton Inference Server release is **2.73.0 / NGC container 26.09**. NVIDIA's compatibility table identifies the 26.09 release and its backend versions. The `26.09-py3` image is a candidate for Python backend; `26.09-py3-min` is the base in NVIDIA's documented general container composition flow, which currently excludes CPU-only customization. Candidate linux/amd64 manifest digests are resolved below. Final runtime image selection and digest pinning await the disk and runtime checks.
 
 CPU inference is an upstream-supported target for x86 and ARM, and both Python and ONNX Runtime are supported backends. For an intentionally tiny first lesson, use a deterministic CPU Python model or a pinned small ONNX model; this teaches Triton's serving protocol and model repository, not GPU LLM inference. Python backend models include `model.py`; the backend must match the Triton release's Python ABI. The live Python backend documentation describes shared-memory IPC, a default 1 MiB region per model instance that can grow, and says Docker's default 64 MiB `/dev/shm` is often too small. Size Kubernetes `emptyDir: {medium: Memory}` for `/dev/shm` from the model instance/input needs, and verify the exact pod runs with the intended non-root UID, writable model/cache/temp paths, and no privileged access. For an ONNX lesson, validate the exact ONNX Runtime backend and model opset on the selected release.
 
@@ -43,7 +50,7 @@ Compressed layer sums do **not** establish extracted/containerd disk fit or extr
 
 The newly provisioned inference test node reported Kubernetes `v1.36.4-gke.1495002`, COS and containerd 2.2.7. That Kubernetes version is inside Slinky 1.2.x's declared matrix. It does not establish privileged admission, writable child cgroups/systemd behavior or resource fit; those Slurm gates remain blocked.
 
-## Deployment decision
+## Historical deployment decision (October 23)
 
 A bounded candidate pull on October 23, 2026 was aborted before Triton became Ready: the 30 GB node crossed the predeclared 20% available-filesystem reserve during pull/unpack. The workload and disposable session were removed. This is a failed disk-reserve gate, not a measurement of final extracted image size or CPU backend operation. No image was selected or pinned for the lesson. The adapter and console controls remain prepared and disabled; a supported CPU source build or a separately reviewed resource plan is still needed before another runtime attempt.
 
